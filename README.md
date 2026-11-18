@@ -51,9 +51,10 @@ sample images made with Nano Banana, nothing is sent to Google or saved. Add
 
 - **An Experience Workspace site** (a DA site with Experience Workspace enabled).
 - **A Gemini API key** for each author, from
-  [Google AI Studio](https://aistudio.google.com/app/apikey). Image models need
-  a key on a project with billing turned on. Each author's images are charged
-  to their key's project; see [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing).
+  [Google AI Studio](https://aistudio.google.com/app/apikey). Image generation
+  is billed to the key's Google Cloud project; see
+  [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing) for
+  rates and free-tier limits.
 
 ## Add it to a site
 
