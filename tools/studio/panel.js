@@ -7,6 +7,7 @@ import {
   MAX_REFERENCES, STUDIO_FOLDER, VARIANTS, buildPrompt, fileName, imageHtml, normalizeFolder,
   pagePrompt, pageFolder, pickImageModel, readPage,
 } from './model.js';
+import { blockImages, swapBlockImage } from './replace.js';
 import { createGeminiAdapter } from './gemini.js';
 import { base64ToBlob, modelInput, toJpeg, urlPool } from './images.js';
 import { el, external, menu } from './ui.js';
@@ -38,6 +39,7 @@ export function mountPanel(root, {
     model: '',
     mode: 'generate', // generate | edit
     source: null, // { key, name } of the image being edited
+    choose: null, // { item, images } while asking which image in a block to replace
     refs: [], // [{ key, name }]
     refsOpen: false,
     prompt: '',
@@ -55,6 +57,7 @@ export function mountPanel(root, {
   let model = null;
   let nextId = 1;
   let unsubscribe = null;
+  let liveDoc = null; // latest live-document snapshot: { html, blockIndex }
   let lastPage = '';
   let dragging = false;
   let renderQueued = false;
@@ -152,7 +155,12 @@ export function mountPanel(root, {
   function loadPage() {
     if (caps.live) {
       unsubscribe?.();
-      unsubscribe = actions.subscribeLiveDocument(({ html }) => usePage(html));
+      unsubscribe = actions.subscribeLiveDocument(({ html, selection }) => {
+        const blockIndex = Number.isInteger(selection?.blockIndex) ? selection.blockIndex : null;
+        const changed = html !== liveDoc?.html;
+        liveDoc = { html, blockIndex };
+        if (changed) usePage(html);
+      });
       return;
     }
     da.pageHtml(page.path).then(usePage).catch(() => {});
@@ -361,11 +369,33 @@ export function mountPanel(root, {
     });
   }
 
-  function replaceSelected(item) {
+  /**
+   * Workspace replaces the whole block the cursor is in, so inside a block we send the block back
+   * with only one image changed (asking which one if it has several); outside a block, the image.
+   */
+  function replaceSelected(item, pick) {
+    set({ choose: null });
+    // A pick from the chooser carries the snapshot it was made from, so a click elsewhere on the
+    // page meanwhile can't apply the choice to another block (Workspace then refuses: STALE_LIVE).
+    const snap = pick?.snap ?? liveDoc;
+    const inBlock = snap && snap.blockIndex !== null;
+    if (inBlock && !pick) {
+      const images = blockImages(snap.html, snap.blockIndex);
+      if (!images) { flash('error', 'Couldn\'t find the selected block. Click the image on the page and try again.'); return; }
+      if (!images.length) { flash('error', 'The selected block has no image. Click the image you want to replace.'); return; }
+      if (images.length > 1) { set({ choose: { item, images, snap } }); return; } // ask before writing alt text
+    }
     guard('Replacing', async () => {
-      const alt = await altFor(item);
-      const html = imageHtml({ src: item.src, alt }).replace(/^<p>|<\/p>$/g, '');
-      const result = await actions.sendHTML(html, { replace: true });
+      if (!item.alt) item.alt = await altFor(item); // eslint-disable-line no-param-reassign -- kept for a retry
+      const { alt } = item;
+      let html = imageHtml({ src: item.src, alt }).replace(/^<p>|<\/p>$/g, '');
+      const options = { replace: true };
+      if (inBlock) {
+        html = swapBlockImage(snap.html, snap.blockIndex, pick?.which ?? 0, { src: item.src, alt });
+        if (!html) throw new Error('Couldn\'t find that image in the block. Click the image on the page and try again.');
+        options.expected = { html: snap.html, blockIndex: snap.blockIndex };
+      }
+      const result = await actions.sendHTML(html, options);
       if (!result?.ok) {
         throw new Error(REPLACE_ERRORS[result?.error] ?? result?.message ?? 'The image couldn\'t be replaced.');
       }
@@ -570,6 +600,23 @@ export function mountPanel(root, {
     const focusKey = root.contains(active) ? active.dataset.key : '';
     const caret = focusKey && typeof active.selectionStart === 'number' ? [active.selectionStart, active.selectionEnd] : null;
 
+    // The selected block has several images: ask which one to replace (the rest stay as they are).
+    const chooseView = () => {
+      const { item, images, snap } = state.choose;
+      return el('div', { className: 'is-note info is-choose', role: 'group', 'aria-labelledby': 'is-choose-title' },
+        el('p', { id: 'is-choose-title' }, `The selected block has ${images.length} images. Which one should be replaced?`),
+        el('div', { className: 'is-row' },
+          ...images.map((img, i) => el('button', {
+            type: 'button',
+            className: 'nx-action-btn nx-btn-sm',
+            key: `choose-${i}`,
+            title: img.label,
+            onClick: () => replaceSelected(item, { snap, which: i }),
+          }, `${i + 1}. ${img.label.length > 28 ? `${img.label.slice(0, 27)}…` : img.label}`)),
+          el('button', {
+            type: 'button', className: 'nx-action-btn nx-action-btn-quiet nx-btn-sm', key: 'choose-cancel', onClick: () => set({ choose: null }),
+          }, 'Cancel')));
+    };
     const body = {
       loading: () => el('p', { className: 'is-fine is-center' }, 'Loading…'),
       connect: connectView,
@@ -580,6 +627,7 @@ export function mountPanel(root, {
       demo && el('p', { className: 'is-note info' }, 'Demo mode: sample images, nothing is sent to Google or saved.'),
       !embedded && !demo && el('p', { className: 'is-note info' }, `Standalone mode: ${page.org}/${page.site}${page.path}. Putting images on the page needs Experience Workspace.`),
       state.message && el('p', { className: `is-note ${state.message.level}` }, state.message.text),
+      state.choose && chooseView(),
       // Generating shows its spinner in the button; other waits get the S2 progress bar.
       state.busy && state.busy !== 'Generating' && state.view === 'main' && el('div', { className: 'is-progress', role: 'progressbar', 'aria-label': state.busy }),
       body,

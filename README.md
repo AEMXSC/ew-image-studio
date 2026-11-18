@@ -128,6 +128,10 @@ fork, and use `https://main--{repo}--{owner}.aem.page/tools/studio/studio.html`
   Library images dragged in have empty alt text unless they already had one;
   **Insert** writes alt text for them. Dragging needs a mouse or touch; **Insert**
   is the keyboard route.
+- **Replace selected** inside a block (hero, cards…) sends the block back with
+  only that image changed, so its text, links and other images stay; Workspace
+  replaces whole blocks, so a lone image would wipe them. If the block has
+  several images, the panel asks which one.
 - **Replace selected** needs the image selected on the page and a Workspace
   version that supports replacing; otherwise insert the new image and delete the old one.
 - Images on other hosts than DA or Edge Delivery can't be edited from the page.

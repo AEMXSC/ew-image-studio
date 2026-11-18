@@ -1,0 +1,56 @@
+/**
+ * Replacing one image inside an EDS block.
+ *
+ * Workspace's `sendHTML(html, { replace: true })` swaps the WHOLE block the
+ * cursor is in, so sending a lone <img> would throw away the block's text,
+ * links and other images. Instead we take the block from the live document
+ * (which keeps every image's original src), change one image, and send the
+ * block back. Uses DOMParser, so it runs in the browser (tested there).
+ */
+
+const INSTRUMENTATION = ['data-block-index', 'data-prose-index', 'data-image-index', 'data-image-version',
+  'data-cursor-remote', 'data-cursor-remote-color'];
+
+/** The selected block in a live-document snapshot: `blockIndex` is its 0-based order among blocks. */
+function findBlock(doc, blockIndex) {
+  const blocks = [...doc.querySelectorAll('[data-block-index]')]
+    .sort((a, b) => Number(a.dataset.blockIndex) - Number(b.dataset.blockIndex));
+  return blocks[blockIndex] ?? null;
+}
+
+function parse(html) {
+  return new DOMParser().parseFromString(html, 'text/html');
+}
+
+function label(img, index) {
+  const alt = (img.getAttribute('alt') ?? '').trim();
+  if (alt) return alt;
+  try {
+    return decodeURIComponent(new URL(img.getAttribute('src') ?? '', 'https://x.invalid').pathname.split('/').pop()) || `Image ${index + 1}`;
+  } catch {
+    return `Image ${index + 1}`;
+  }
+}
+
+/** The images in the selected block, as [{ label }], or null when the block isn't in the snapshot. */
+export function blockImages(html, blockIndex) {
+  const block = findBlock(parse(html), blockIndex);
+  if (!block) return null;
+  return [...block.querySelectorAll('img')].map((img, i) => ({ label: label(img, i) }));
+}
+
+/**
+ * The selected block's HTML with image `which` (0-based) swapped for `src`/`alt`.
+ * Everything else in the block (text, links, other images) is sent back unchanged.
+ */
+export function swapBlockImage(html, blockIndex, which, { src, alt = '' }) {
+  const block = findBlock(parse(html), blockIndex);
+  const img = block?.querySelectorAll('img')[which];
+  if (!img) return '';
+  img.setAttribute('src', src);
+  img.setAttribute('alt', alt);
+  // The new file may differ in format from the old sources' declared type: drop the type.
+  img.closest('picture')?.querySelectorAll('source').forEach((s) => { s.setAttribute('srcset', src); s.removeAttribute('type'); });
+  [block, ...block.querySelectorAll('*')].forEach((node) => INSTRUMENTATION.forEach((a) => node.removeAttribute(a)));
+  return block.outerHTML;
+}
