@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Image Studio</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <!-- Scripts and styles only from this site and da.live (SDK, style guide); network only to
+         Google's Gemini API, DA and public Edge Delivery media. No inline script or style attributes. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://da.live; style-src 'self' https://da.live; font-src https://da.live; img-src 'self' https://da.live blob: data:; connect-src 'self' https://generativelanguage.googleapis.com https://admin.da.live https://*.aem.page https://*.aem.live; base-uri 'none'; form-action 'none'; object-src 'none'">
+    <link rel="icon" href="data:,">
+    <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
+    <!-- Experience Workspace style guide: Spectrum 2 tokens, Adobe Clean, buttons, fields -->
+    <link rel="stylesheet" href="https://da.live/nx2/styles/styles.css"/>
+    <link rel="stylesheet" href="https://da.live/nx2/styles/buttons.css"/>
+    <link rel="stylesheet" href="https://da.live/nx2/styles/form.css"/>
+    <link rel="stylesheet" href="./studio.css"/>
+    <script src="./studio.js" type="module"></script>
+  </head>
+  <body>
+    <main id="studio-app" class="is">
+      <p class="is-fine is-center">Loading…</p>
+    </main>
+    <div id="is-live" class="is-sr" role="status" aria-live="polite"></div>
+  </body>
+</html>

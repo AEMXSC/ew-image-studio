@@ -1,0 +1,23 @@
+{
+  "name": "ew-image-studio",
+  "version": "1.0.0",
+  "description": "Image Studio (Google Nano Banana) panel for Adobe Experience Workspace",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "lint": "npm run lint:js && npm run lint:css",
+    "lint:js": "eslint --ext .js,.mjs tools/ test/",
+    "lint:css": "stylelint \"tools/**/*.css\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@adobe/eslint-config-helix": "^2.0.9",
+    "eslint": "^8.57.1",
+    "stylelint": "^16.26.1",
+    "stylelint-config-standard": "^38.0.0"
+  }
+}
