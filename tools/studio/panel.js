@@ -67,7 +67,9 @@ export function mountPanel(root, {
   const failedThumbs = new Set();
   let thumbsLoading = 0;
   const caps = {
-    drag: capabilities.dragDrop === 1 && typeof actions.makeDraggable === 'function',
+    // makeDraggable uses Workspace's drag session when the host advertises dragDrop, and the
+    // browser's own drag and drop otherwise (older hosts), so offer dragging whenever it exists.
+    drag: typeof actions.makeDraggable === 'function',
     replace: capabilities.sendHTMLReplace === 1,
     insert: typeof actions.sendHTML === 'function',
     live: capabilities.liveDocument === 1 && typeof actions.subscribeLiveDocument === 'function',
@@ -386,6 +388,7 @@ export function mountPanel(root, {
       clearTimeout(dragTimer);
       dragTimer = setTimeout(settle, 125000); // Workspace gives up on a drag after two minutes
     });
+    node.addEventListener('dragend', settle); // the browser's own drag (older hosts) ends here
     actions.makeDraggable({
       element: node,
       getData: () => {
