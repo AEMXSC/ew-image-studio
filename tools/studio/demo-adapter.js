@@ -12,8 +12,10 @@ const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 const NEW = ['hero-1.jpg', 'hero-2.jpg', 'hero-3.jpg'];
 const EDITS = ['edit-1.jpg', 'edit-2.jpg', 'edit-3.jpg'];
 const ALT = {
-  'hero-1.jpg': 'A bag of Fréscopa autumn house blend beside a cup of coffee on a wooden café table',
-  'edit-1.jpg': 'The same coffee scene restyled with autumn leaves and warm evening light',
+  'hero-1.jpg': 'A bag of Fréscopa Autumn House Blend beside a mug of coffee, hazelnuts and sliced apple on a wooden café table',
+  'edit-1.jpg': 'A café counter in warm autumn evening light, with a bag of Fréscopa coffee and orange leaves on the counter',
+  'bag.jpg': 'A kraft-paper bag of Fréscopa Autumn House Blend coffee on a plain grey background',
+  'cafe.jpg': 'A bright café counter with an espresso machine, plants and pastries under glass',
 };
 
 export const DEMO_PAGE = `<main><div>

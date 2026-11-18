@@ -34,7 +34,9 @@ test('model prompt: edits keep the rest, references keep the product, style and 
   assert.match(edit, /^Edit the first image: autumn leaves\n/);
   assert.match(edit, /The other images are references: show the products in them exactly as they look/);
   assert.match(edit, /Brand style: Warm light/);
-  assert.match(edit, /No words, letters or logos/);
+  assert.match(edit, /Keep the labels on the reference products exactly as they are; no other words/,
+    'with references, the no-text rule must not blank out product labels');
+  assert.match(buildPrompt({ kind: 'generate', prompt: 'A café' }), /No words, letters or logos/);
   const gen = buildPrompt({ kind: 'generate', prompt: 'A café', references: 2 });
   assert.match(gen, /^A café\nThe images are references/);
   assert.doesNotMatch(buildPrompt({ kind: 'generate', prompt: 'A café' }), /references|Brand style/);
@@ -99,7 +101,8 @@ test('brand style comes from the image-studio sheet, multi- or single-sheet', ()
 });
 
 test('default image model: Flash, stable, newest', () => {
-  const ids = ['gemini-3-pro-image-preview', 'gemini-2.5-flash-image', 'gemini-3.1-flash-image-preview', 'gemini-3.1-flash-image'];
+  // The list one real key returned (November 2026).
+  const ids = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3-pro-image', 'gemini-3.1-flash-image-preview', 'gemini-3.1-flash-lite-image', 'gemini-3.1-flash-image'];
   assert.equal(pickImageModel(ids.map((id) => ({ id }))), 'gemini-3.1-flash-image');
   assert.equal(pickImageModel([]), '');
 });

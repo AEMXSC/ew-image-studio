@@ -66,13 +66,15 @@ export function readPage(html = '', limit = 600) {
 // ---------- prompts ----------
 
 const NO_TEXT = 'No words, letters or logos in the image.';
+const NO_OTHER_TEXT = 'Keep the labels on the reference products exactly as they are; no other words, letters or logos anywhere.';
 
 /** Starting prompt for a new image, from the page. The author edits it before generating. */
 export function pagePrompt({ title, text }, aspect = '16:9') {
   const use = ASPECTS.find((a) => a.id === aspect)?.label.toLowerCase() ?? 'hero';
   if (!title && !text) return `A ${use} image for this web page. Photographic, natural light.`;
   const about = [title && `"${title}"`, text && `The page says: ${text}`].filter(Boolean).join('. ');
-  return `A ${use} image for a web page titled ${about}\nPhotographic, natural light, room for a headline.`;
+  // Not "room for a headline": the model then paints a (garbled) headline into the picture.
+  return `A ${use} image for a web page titled ${about}\nPhotographic, natural light, with calm empty space on one side; the page adds its own text.`;
 }
 
 /**
@@ -93,7 +95,8 @@ export function buildPrompt({ kind, prompt, references = 0, style = '' }) {
     lines.push(`${which} references: show the products in them exactly as they look (shape, label, colours). Don't redesign them.`);
   }
   if (style.trim()) lines.push(`Brand style: ${style.trim()}`);
-  lines.push(NO_TEXT);
+  // "No text" alone makes the model blank out the labels of the reference products.
+  lines.push(references ? NO_OTHER_TEXT : NO_TEXT);
   return lines.join('\n');
 }
 
@@ -209,11 +212,12 @@ export function styleFromConfig(config) {
   return String(row?.value ?? '').trim();
 }
 
-/** Picks the default image model: Flash before Pro, stable before preview, newest version first. */
+/** Picks the default image model: Flash before Pro, full before Lite, stable before preview, newest first. */
 export function pickImageModel(models) {
   const score = (id) => {
     const version = Number((/gemini-(\d+(?:\.\d+)?)/.exec(id) ?? [])[1] ?? 0);
-    return (id.includes('flash') ? 1000 : 0) + (id.includes('preview') ? 0 : 100) + version;
+    return (id.includes('flash') ? 1000 : 0) + (id.includes('lite') ? 0 : 500)
+      + (id.includes('preview') ? 0 : 100) + version;
   };
   return [...models].sort((a, b) => score(b.id) - score(a.id))[0]?.id ?? '';
 }
