@@ -28,8 +28,13 @@ function stripTags(s) {
 
 function decodeEntities(s) {
   // &amp; last, so "&amp;lt;" stays "&lt;" instead of becoming "<".
-  return s.replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+  const char = (n) => (n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : ''); // out of range would throw
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => char(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => char(Number(n)))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&');
@@ -47,7 +52,7 @@ function attr(tag, name) {
 export function readPage(html = '', limit = 600) {
   const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(html);
   const title = h1 ? stripTags(h1[1]) : '';
-  const paragraphs = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+  const paragraphs = [...html.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/gi)] // <p>, not <picture> or <pre>
     .map((m) => stripTags(m[1]))
     .filter((t) => t.length > 20);
   let text = '';
@@ -114,10 +119,9 @@ export function cleanAlt(text = '') {
 // ---------- files and paths ----------
 
 /** Readable, unique file name: the prompt's first words plus a timestamp. */
-export function fileName(prompt, mime = 'image/jpeg', now = new Date()) {
+export function fileName(prompt, mime = 'image/jpeg', now = new Date(), suffix = '') {
   const words = prompt.toLowerCase()
     .normalize('NFKD').replace(/[̀-ͯ]/g, '')
-    .replace(/^(edit the first image: )/, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .split(' ')
@@ -125,7 +129,7 @@ export function fileName(prompt, mime = 'image/jpeg', now = new Date()) {
     .slice(0, 6);
   const pad = (n) => String(n).padStart(2, '0');
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  return `${words.join('-') || 'studio'}-${stamp}.${extFor(mime)}`;
+  return `${words.join('-') || 'studio'}-${stamp}${suffix === '' ? '' : `-${suffix}`}.${extFor(mime)}`;
 }
 
 export function extFor(mime = '') {
@@ -145,7 +149,8 @@ export function pageFolder(path = '/') {
 
 /** Where the editor points an image stored in DA (what goes in <img src>). */
 export function contentUrl(org, site, path) {
-  return `${DA_CONTENT}/${org}/${site}${normalizeFolder(path)}`;
+  const encoded = normalizeFolder(path).split('/').map(encodeURIComponent).join('/');
+  return `${DA_CONTENT}/${org}/${site}${encoded}`;
 }
 
 /**

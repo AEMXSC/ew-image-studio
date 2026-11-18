@@ -43,15 +43,6 @@ export function browserStorage(store) {
     setModel: (m) => write('model', m),
     folder: (org, site) => read(`folder:${org}/${site}`),
     setFolder: (org, site, f) => write(`folder:${org}/${site}`, f),
-    clear() {
-      try {
-        const keys = [];
-        for (let i = 0; i < store.length; i += 1) keys.push(store.key(i));
-        keys.filter((k) => k?.startsWith(PREFIX)).forEach((k) => store.removeItem(k));
-      } catch {
-        // nothing to clear
-      }
-    },
   };
 }
 

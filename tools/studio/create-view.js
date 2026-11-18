@@ -120,7 +120,7 @@ function variantCard(ctx, v, index) {
         }, v.status === 'saving' ? 'Saving…' : 'Accept'),
         iconButton('brush', 'Edit this', { className: 'nx-action-btn-quiet nx-btn-sm', key: `refine-${v.id}`, onClick: () => ctx.refine(v.id) }),
         el('button', {
-          type: 'button', className: 'nx-action-btn-icon is-push', 'aria-label': 'Discard', title: 'Discard', onClick: () => ctx.discard(v.id),
+          type: 'button', className: 'nx-action-btn-icon is-push', key: `discard-${v.id}`, 'aria-label': 'Discard', title: 'Discard', onClick: () => ctx.discard(v.id),
         }, icon('delete'))));
 }
 
@@ -128,9 +128,9 @@ function variantCard(ctx, v, index) {
 export function placeActions(ctx, item) {
   const { caps } = ctx;
   return el('div', { className: 'is-row' },
-    caps.insert && iconButton('imageadd', 'Insert', { className: 'nx-action-btn nx-btn-sm', onClick: () => ctx.insert(item) }),
+    caps.insert && iconButton('imageadd', 'Insert', { className: 'nx-action-btn nx-btn-sm', key: `insert-${item.src}`, onClick: () => ctx.insert(item) }),
     caps.replace && iconButton('replace', 'Replace selected', {
-      className: 'nx-action-btn nx-btn-sm', title: 'Replace the image selected on the page', onClick: () => ctx.replaceSelected(item),
+      className: 'nx-action-btn nx-btn-sm', key: `replace-${item.src}`, title: 'Replace the image selected on the page', onClick: () => ctx.replaceSelected(item),
     }),
     caps.drag && el('span', { className: 'is-fine' }, 'or drag the picture onto the page'));
 }

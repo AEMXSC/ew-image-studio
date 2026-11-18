@@ -39,7 +39,7 @@ async function init() {
 
   // ?demo=1 uses sample images: no key, nothing is sent to Google or saved to DA.
   if (params.get('demo') === '1') {
-    const { createDemoModel, createDemoDa, DEMO_PAGE } = await import('./demo-adapter.js');
+    const { createDemoModel, createDemoDa } = await import('./demo-adapter.js');
     if (!page.org) page = { org: 'demo', site: 'frescopa', path: '/campaigns/autumn-house-blend' };
     da = createDemoDa();
     // Dragging still works (the image is a real file); inserting by address would point at demo files.
@@ -47,7 +47,6 @@ async function init() {
     capabilities = { dragDrop: capabilities.dragDrop };
     const storage = browserStorage(memoryStore());
     storage.setKey('demo');
-    da.pageHtml = async () => DEMO_PAGE;
     options = { modelFactory: createDemoModel, storage, demo: true };
   }
 

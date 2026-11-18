@@ -9,21 +9,24 @@
 import { ALT_PROMPT, cleanAlt } from './model.js';
 
 export const API = 'https://generativelanguage.googleapis.com/v1beta';
+const TIMEOUT_MS = 120000;
 const TEXT_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
 const BLOCKED = new Set(['SAFETY', 'IMAGE_SAFETY', 'PROHIBITED_CONTENT', 'IMAGE_PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'RECITATION', 'IMAGE_RECITATION']);
 
 export class ModelError extends Error {
   constructor(code, message) {
     super(message);
-    this.code = code; // unauthorized | quota | blocked | noimage | network | failed
+    this.code = code; // unauthorized | notfound | quota | blocked | noimage | network | failed
   }
 }
 
 function toError(status, body) {
   const message = body?.error?.message ?? '';
-  if (status === 401 || status === 403 || /api key/i.test(message)) {
+  // Only a missing or invalid key signs the author out; a 403 for one model or project keeps the key.
+  if (status === 401 || (status === 400 && /api key/i.test(message))) {
     return new ModelError('unauthorized', 'Google didn\'t accept the API key. Check it in Google AI Studio and connect again.');
   }
+  if (status === 404) return new ModelError('notfound', message || 'That model isn\'t available.');
   if (status === 429) {
     return new ModelError('quota', 'Google\'s rate or quota limit for this key was reached. Wait a minute, or check billing in Google AI Studio.');
   }
@@ -55,9 +58,11 @@ export function createGeminiAdapter({ key, fetch = (...a) => window.fetch(...a) 
     try {
       resp = await fetch(`${API}${path}`, {
         ...init,
+        signal: AbortSignal.timeout(TIMEOUT_MS), // a hung request must not keep the panel busy forever
         headers: { 'x-goog-api-key': key, ...(init.body ? { 'content-type': 'application/json' } : {}) },
       });
-    } catch {
+    } catch (e) {
+      if (e.name === 'TimeoutError') throw new ModelError('network', 'Google took too long to answer. Try again.');
       throw new ModelError('network', 'Couldn\'t reach Google. Check your connection.');
     }
     const body = await resp.json().catch(() => null);
@@ -108,7 +113,7 @@ export function createGeminiAdapter({ key, fetch = (...a) => window.fetch(...a) 
           });
           return cleanAlt(readReply(body, 'text'));
         } catch (e) {
-          if (e.code === 'unauthorized' || e.code === 'quota') return '';
+          if (e.code !== 'notfound') return ''; // only try the next model if this one doesn't exist
         }
       }
       return '';

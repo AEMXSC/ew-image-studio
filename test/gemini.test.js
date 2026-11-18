@@ -45,6 +45,8 @@ test('generate: sends prompt, input images and shape; returns the image', async 
 test('errors are readable and typed', async () => {
   const bad = fakeFetch([[400, { error: { message: 'API key not valid. Please pass a valid API key.' } }]]);
   await assert.rejects(createGeminiAdapter({ key: 'k', fetch: bad.fetch }).models(), { code: 'unauthorized' });
+  const forbidden = fakeFetch([[403, { error: { message: 'Permission denied on this model' } }]]);
+  await assert.rejects(createGeminiAdapter({ key: 'k', fetch: forbidden.fetch }).models(), { code: 'failed' }, 'a 403 keeps the key');
   const busy = fakeFetch([[429, { error: { message: 'Resource exhausted' } }]]);
   await assert.rejects(createGeminiAdapter({ key: 'k', fetch: busy.fetch }).models(), { code: 'quota' });
   const offline = createGeminiAdapter({ key: 'k', fetch: async () => { throw new TypeError('Failed to fetch'); } });

@@ -58,6 +58,8 @@ export function mountPanel(root, {
   let lastPage = '';
   let dragging = false;
   let renderQueued = false;
+  let dragTimer = null;
+  let renderRetry = null;
   let disposers = [];
   const blobs = new Map(); // key → Blob (page/library images, variants, uploads)
   const pool = urlPool();
@@ -75,7 +77,8 @@ export function mountPanel(root, {
   const flash = (level, text) => {
     set({ message: { level, text } });
     if (live) live.textContent = text;
-    setTimeout(() => { if (state.message?.text === text) set({ message: null }); }, 6000);
+    // Errors stay until the next action, so nobody has to read them in six seconds.
+    if (level !== 'error') setTimeout(() => { if (state.message?.text === text) set({ message: null }); }, 6000);
   };
   const fail = (e) => {
     if (e.code === 'unauthorized') { signOut(e.message); return; }
@@ -105,8 +108,9 @@ export function mountPanel(root, {
 
   async function openWith(key) {
     model = modelFactory({ key });
+    let failure = '';
     await guard('Connecting', async () => {
-      const models = await model.models();
+      const models = await model.models().catch((e) => { failure = e.message; throw e; });
       if (!models.length) throw new Error('This key can\'t use any Gemini image model. Check the key\'s project in Google AI Studio.');
       storage.setKey(key);
       const saved = storage.model();
@@ -119,6 +123,8 @@ export function mountPanel(root, {
       loadPage();
       da.style().then((style) => set({ style }));
     });
+    // A stored key but Google unreachable: say so and offer a retry instead of "Loading…".
+    if (state.view === 'loading') set({ view: 'error', error: failure || 'Couldn\'t reach Google.' });
   }
 
   function signOut(message) {
@@ -239,7 +245,7 @@ export function mountPanel(root, {
     });
     guard('Generating', async () => {
       const images = await Promise.all(inputs.map((i) => modelInput(blobs.get(i.key))));
-      dropVariants((v) => v.status !== 'saved');
+      dropVariants((v) => v.status !== 'saved' && v.status !== 'saving'); // a save in progress keeps its card
       const batch = Array.from({ length: VARIANTS }, () => {
         const id = nextId;
         nextId += 1;
@@ -257,6 +263,7 @@ export function mountPanel(root, {
       render();
       if (failures.length === VARIANTS) throw failures[0].reason;
       if (failures.length) flash('warn', `${VARIANTS - failures.length} of ${VARIANTS} images came back. ${failures[0].reason.message}`);
+      else flash('success', `${VARIANTS} images ready. Accept the ones to keep.`);
     });
   }
 
@@ -283,7 +290,7 @@ export function mountPanel(root, {
       const blob = blobs.get(`v:${id}`);
       const [alt, src] = await Promise.all([
         model.describe(await modelInput(blob)),
-        da.save(`${STUDIO_FOLDER}/${fileName(v.prompt, blob.type)}`, blob),
+        da.save(`${STUDIO_FOLDER}/${fileName(v.prompt, blob.type, new Date(), v.id)}`, blob),
       ]);
       blobs.set(src, blob);
       updateVariant(id, { status: 'saved', alt, src, name: src.split('/').pop() });
@@ -291,7 +298,8 @@ export function mountPanel(root, {
         const item = { path: `${STUDIO_FOLDER}/${src.split('/').pop()}`, name: src.split('/').pop(), modified: Date.now(), src, alt };
         state.library = { ...state.library, items: [item, ...state.library.items] };
       }
-      flash('success', caps.drag ? 'Saved to the site. Drag it onto the page.' : 'Saved to the site.');
+      if (!alt) flash('warn', 'Saved, but without alt text: Google didn\'t write it. Add alt text on the page.');
+      else flash('success', caps.drag ? 'Saved to the site. Drag it onto the page.' : 'Saved to the site.');
     } catch (e) {
       updateVariant(id, { status: 'ready' });
       fail(e);
@@ -299,7 +307,11 @@ export function mountPanel(root, {
   }
 
   function refine(id) {
-    editImage({ key: `v:${id}`, name: 'Generated image' });
+    // Copy the image to its own key: the next Generate drops unaccepted variants and their blobs.
+    const key = `f:${nextId}`;
+    nextId += 1;
+    blobs.set(key, blobs.get(`v:${id}`));
+    editImage({ key, name: 'Generated image' });
   }
 
   // ---------- library ----------
@@ -307,13 +319,19 @@ export function mountPanel(root, {
   async function openFolder(folder = state.library.folder) {
     const clean = normalizeFolder(folder);
     storage.setFolder(page.org, page.site, clean);
-    set({ library: { ...state.library, folder: clean, loaded: false, shown: PAGE_SIZE } });
+    set({
+      library: {
+        ...state.library, folder: clean, folderDraft: null, query: '', loaded: false, error: '', shown: PAGE_SIZE,
+      },
+    });
     try {
       const items = await da.list(clean);
+      if (state.library.folder !== clean) return; // another folder was opened meanwhile
       set({ library: { ...state.library, items, loaded: true } });
       items.slice(0, PAGE_SIZE).forEach((i) => queueThumb(i.src));
     } catch (e) {
-      set({ library: { ...state.library, items: [], loaded: true } });
+      if (state.library.folder !== clean) return;
+      set({ library: { ...state.library, items: [], loaded: true, error: e.message } });
       fail(e);
     }
   }
@@ -357,6 +375,7 @@ export function mountPanel(root, {
   function draggable(node, item) {
     if (!caps.drag) return;
     const settle = () => {
+      clearTimeout(dragTimer);
       dragging = false;
       if (renderQueued) render();
     };
@@ -364,7 +383,8 @@ export function mountPanel(root, {
       dragging = true;
       // A plain click ends here; a real drag hands the pointer to Workspace and ends in onResult.
       window.addEventListener('pointerup', settle, { once: true });
-      setTimeout(settle, 125000); // Workspace gives up on a drag after two minutes
+      clearTimeout(dragTimer);
+      dragTimer = setTimeout(settle, 125000); // Workspace gives up on a drag after two minutes
     });
     actions.makeDraggable({
       element: node,
@@ -386,13 +406,13 @@ export function mountPanel(root, {
   const ctx = {
     state,
     caps,
-    demo,
-    embedded,
     set,
     thumbUrl,
     draggable,
     wantThumb: queueThumb,
     thumbFailed: (key) => failedThumbs.has(key),
+    // Library filtering redraws its cards without a full render: drop their old drag registrations.
+    resetDrags: () => { disposers.forEach((d) => d()); disposers = []; },
     setMode,
     setAspect,
     editImage,
@@ -492,8 +512,31 @@ export function mountPanel(root, {
         state.tab === 'create' ? createView(ctx) : libraryView(ctx)));
   }
 
+  /** True while a shared picker or menu has its popover open: rebuilding would destroy it mid-choice. */
+  function popoverOpen() {
+    return [...root.querySelectorAll('nx-picker, nx-menu')]
+      .some((p) => p.open || p.shadowRoot?.querySelector('[aria-expanded="true"]'));
+  }
+
+  /** Errors that stop the panel (outside Workspace, Google unreachable), with a way forward. */
+  function errorView() {
+    const key = storage.key();
+    return el('section', { className: 'is-card' },
+      el('p', { className: 'is-note error', role: 'alert' }, state.error),
+      key && el('div', { className: 'is-row' },
+        el('button', {
+          type: 'button', className: 'nx-btn-accent', key: 'retry', onClick: () => { set({ view: 'loading' }); openWith(key); },
+        }, 'Try again'),
+        el('button', { type: 'button', className: 'nx-action-btn', key: 'other-key', onClick: () => signOut('') }, 'Use another key')));
+  }
+
   function render() {
     if (dragging) { renderQueued = true; return; } // rebuilding would cancel the drag
+    if (popoverOpen()) {
+      clearTimeout(renderRetry);
+      renderRetry = setTimeout(render, 300); // the newest state is drawn once it closes
+      return;
+    }
     renderQueued = false;
     disposers.forEach((d) => d());
     disposers = [];
@@ -506,7 +549,7 @@ export function mountPanel(root, {
       loading: () => el('p', { className: 'is-fine is-center' }, 'Loading…'),
       connect: connectView,
       main: mainView,
-    }[state.view]?.() ?? el('p', { role: 'alert' }, state.error);
+    }[state.view]?.() ?? errorView();
     root.replaceChildren(...[
       header(),
       demo && el('p', { className: 'is-note info' }, 'Demo mode: sample images, nothing is sent to Google or saved.'),
@@ -530,5 +573,4 @@ export function mountPanel(root, {
   } else {
     start();
   }
-  return { state, destroy: () => { unsubscribe?.(); disposers.forEach((d) => d()); } };
 }

@@ -55,6 +55,15 @@ test('file names are readable, unique and typed', () => {
   assert.equal(fileName('???', 'image/png', now), 'studio-20261118-090507.png');
 });
 
+test('review fixes: unique names per variant, encoded addresses, safe entities, <p> only', () => {
+  const now = new Date(2026, 10, 18, 9, 5, 7);
+  assert.notEqual(fileName('A café', 'image/jpeg', now, 1), fileName('A café', 'image/jpeg', now, 2), 'two accepts in one second');
+  assert.equal(contentUrl('o', 's', '/media/a #1?.png'), 'https://content.da.live/o/s/media/a%20%231%3F.png');
+  assert.equal(readPage('<h1>Caf&#x00e9; &#99999999;</h1>').title, 'Café', 'hex decoded, out-of-range dropped, no throw');
+  const page = readPage('<picture><source srcset="x"></picture><pre>code block that is long enough</pre><p>A real paragraph that is long enough.</p>');
+  assert.equal(page.text, 'A real paragraph that is long enough.');
+});
+
 test('folders and DA addresses', () => {
   assert.equal(normalizeFolder('media//studio/'), '/media/studio');
   assert.equal(normalizeFolder(''), '/');
