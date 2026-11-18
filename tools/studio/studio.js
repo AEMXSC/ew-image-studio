@@ -4,14 +4,22 @@
  * reads org/site/path from the query string.
  */
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
+import { setConfig } from 'https://da.live/nx2/scripts/nx.js';
 import { mountPanel } from './panel.js';
 import { createDa } from './da.js';
 import { browserStorage, memoryStore, panelStore } from './storage.js';
+import { CODE_BASE } from './ui.js';
 
 const SDK_TIMEOUT = 3000;
+// Workspace's shared Spectrum 2 components, as adobe-rnd/ew-extensions loads them.
+const COMPONENTS = ['segmented-btn/segmented', 'switch/switch', 'picker/picker', 'search/search', 'card/card', 'menu/menu']
+  .map((c) => `https://da.live/nx2/blocks/shared/${c}.js`);
 
 async function init() {
   const root = document.getElementById('studio-app');
+  // The components read their icons from codeBase/img/icons when they load, so set it first.
+  await setConfig({ codeBase: CODE_BASE });
+  await Promise.all(COMPONENTS.map((c) => import(c)));
   const timeout = new Promise((resolve) => { setTimeout(() => resolve(null), SDK_TIMEOUT); });
   const sdk = await Promise.race([DA_SDK, timeout]).catch(() => null);
 

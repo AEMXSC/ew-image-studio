@@ -9,7 +9,7 @@ import {
 } from './model.js';
 import { createGeminiAdapter } from './gemini.js';
 import { base64ToBlob, modelInput, toJpeg, urlPool } from './images.js';
-import { el, external, icon } from './ui.js';
+import { el, external, menu } from './ui.js';
 import { createView } from './create-view.js';
 import { libraryView } from './library-view.js';
 
@@ -419,11 +419,19 @@ export function mountPanel(root, {
         el('div', {},
           el('h1', { className: 'is-title' }, 'Image Studio'),
           el('span', { className: 'is-sub' }, current ? current.label : 'Google Nano Banana'))),
-      state.view === 'main' && !demo && el('details', { className: 'is-menu' },
-        el('summary', { 'aria-label': 'More', className: 'nx-action-btn-icon', key: 'menu' }, icon('more')),
-        el('div', { className: 'is-menu-list' },
-          external(KEY_HELP, 'Manage keys in Google AI Studio'),
-          el('button', { type: 'button', onClick: () => signOut('') }, 'Disconnect Google'))));
+      state.view === 'main' && !demo && menu({
+        label: 'More',
+        key: 'menu',
+        items: [
+          { id: 'keys', label: 'Manage keys in Google AI Studio', icon: 'openin' },
+          { divider: true },
+          { id: 'disconnect', label: 'Disconnect Google', icon: 'close' },
+        ],
+        onSelect: (id) => {
+          if (id === 'keys') window.open(KEY_HELP, '_blank', 'noopener,noreferrer');
+          if (id === 'disconnect') signOut('');
+        },
+      }));
   }
 
   function connectView() {
@@ -504,7 +512,8 @@ export function mountPanel(root, {
       demo && el('p', { className: 'is-note info' }, 'Demo mode: sample images, nothing is sent to Google or saved.'),
       !embedded && !demo && el('p', { className: 'is-note info' }, `Standalone mode: ${page.org}/${page.site}${page.path}. Putting images on the page needs Experience Workspace.`),
       state.message && el('p', { className: `is-note ${state.message.level}` }, state.message.text),
-      state.busy && state.view === 'main' && el('div', { className: 'is-progress', role: 'progressbar', 'aria-label': state.busy }),
+      // Generating shows its spinner in the button; other waits get the S2 progress bar.
+      state.busy && state.busy !== 'Generating' && state.view === 'main' && el('div', { className: 'is-progress', role: 'progressbar', 'aria-label': state.busy }),
       body,
     ].filter((n) => n instanceof Node));
 

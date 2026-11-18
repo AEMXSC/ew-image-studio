@@ -1,30 +1,30 @@
 /**
  * DOM helpers shared by the views. Text goes in as text nodes only: nothing
  * from the page, DA or the model is ever parsed as HTML.
+ *
+ * Controls are Experience Workspace's shared Spectrum 2 components
+ * (da.live/nx2/blocks/shared, loaded in studio.js) and its style-guide
+ * classes; icons are the S2 workflow icons in ./img/icons, the folder the
+ * shared components also read their icons from (codeBase).
  */
 import { safeUrl } from './model.js';
 
-/** Spectrum 2 workflow icons (18px), trusted constants only. */
-const ICONS = {
-  more: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="16" cy="10" r="1.6"/></svg>',
-  refresh: '<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16.2 8.3A6.5 6.5 0 1 0 16 13"/><path d="M16.5 3.5v4.8h-4.8"/></svg>',
-  sparkle: '<svg viewBox="0 0 20 20" aria-hidden="true" fill="currentColor"><path d="M8 2.5l1.3 3.7L13 7.5l-3.7 1.3L8 12.5 6.7 8.8 3 7.5l3.7-1.3zM14.5 11l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>',
-  check: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="currentColor"/><path d="m6.5 10.2 2.4 2.4 4.6-4.8" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  close: '<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l10 10M15 5 5 15"/></svg>',
-  plus: '<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>',
-  drag: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="5" r="1.4"/><circle cx="13" cy="5" r="1.4"/><circle cx="7" cy="10" r="1.4"/><circle cx="13" cy="10" r="1.4"/><circle cx="7" cy="15" r="1.4"/><circle cx="13" cy="15" r="1.4"/></svg>',
-};
+export const CODE_BASE = new URL('.', import.meta.url).href.replace(/\/$/, '');
+const ICON_NAME = /^[a-z0-9]+$/;
 
+/** An S2 icon from ./img/icons (s2-icon-{name}-20-n.svg), drawn in currentColor. */
 export function icon(name) {
+  if (!ICON_NAME.test(name)) throw new Error(`Unknown icon ${name}`);
   const span = document.createElement('span');
   span.className = 'is-icon';
-  span.innerHTML = ICONS[name];
+  span.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true"><use href="${CODE_BASE}/img/icons/s2-icon-${name}-20-n.svg#icon"></use></svg>`;
   return span;
 }
 
 /**
  * Tiny hyperscript helper. `href` only accepts http(s) URLs; `key` marks a
- * focusable element so focus survives re-renders.
+ * focusable element so focus survives re-renders; `props` sets properties
+ * (for the shared components' items/value/checked).
  */
 export function el(tag, props = {}, ...children) {
   const node = document.createElement(tag);
@@ -34,6 +34,7 @@ export function el(tag, props = {}, ...children) {
     else if (k === 'key') node.dataset.key = v;
     else if (k === 'href') node.setAttribute('href', safeUrl(v) || '#');
     else if (k === 'value') node.value = v;
+    else if (k === 'props') Object.assign(node, v);
     else if (k.startsWith('on')) node.addEventListener(k.slice(2).toLowerCase(), v);
     else node.setAttribute(k, v === true ? '' : v);
   });
@@ -51,16 +52,35 @@ export function external(href, label, props = {}) {
   }, label);
 }
 
-/** A row of toggle buttons (S2 segmented control) for one choice; the chosen one is pressed. */
-export function segmented({ label, options, value, onChange, key, disabled }) {
-  return el('div', { className: 'is-seg', role: 'group', 'aria-label': label },
-    options.map((o) => el('button', {
-      type: 'button',
-      key: `${key}-${o.id}`,
-      className: `nx-action-btn nx-btn-sm${o.id === value ? ' on' : ''}`,
-      'aria-pressed': String(o.id === value),
-      disabled,
-      title: o.title,
-      onClick: () => onChange(o.id),
-    }, o.label)));
+/** A labelled button with a leading S2 icon (nx-action-btn family). */
+export function iconButton(iconName, label, props = {}) {
+  return el('button', { type: 'button', ...props }, icon(iconName), el('span', {}, label));
+}
+
+/** nx-segmented-btn: one choice from a few. */
+export function segmented({ label, items, value, onChange, key, size = 'm' }) {
+  return el('nx-segmented-btn', {
+    key, size, props: { label, items, value }, onChange: (e) => onChange(e.detail.value),
+  });
+}
+
+/** nx-switch: a setting that applies straight away. */
+export function toggle({ label, checked, onChange, key }) {
+  return el('nx-switch', { key, size: 'sm', props: { label, checked }, onChange: (e) => onChange(e.detail.checked) });
+}
+
+/** nx-picker as a form field. */
+export function picker({ items, value, onChange, key, label }) {
+  return el('nx-picker', {
+    key, variant: 'field', size: 'm', 'aria-label': label, props: { items, value }, onChange: (e) => onChange(e.detail.value),
+  });
+}
+
+/** nx-menu behind an icon button; `items` are { id, label, icon? }. */
+export function menu({ label, items, onSelect, key, slot }) {
+  // Run the action after the menu has closed: it may re-render the panel and remove the menu.
+  return el('nx-menu', { key, slot, props: { items }, onSelect: (e) => setTimeout(() => onSelect(e.detail.id)) },
+    el('button', {
+      type: 'button', slot: 'trigger', className: 'nx-action-btn-icon', 'aria-label': label, title: label,
+    }, icon('more')));
 }
