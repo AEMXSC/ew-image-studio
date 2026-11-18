@@ -17,7 +17,7 @@ const KEY_HELP = 'https://aistudio.google.com/app/apikey';
 const THUMB_CONCURRENCY = 6;
 const PAGE_SIZE = 24;
 const REPLACE_ERRORS = {
-  unsupported: 'This version of Workspace can\'t replace images from a panel. Drag the image onto the one you want to replace instead.',
+  unsupported: 'This version of Workspace can\'t replace images from a panel. Insert the new image, then delete the old one.',
   READ_ONLY: 'You can\'t edit this page.',
   NO_TARGET: 'Click the image on the page that you want to replace, then try again.',
   CROSS_TARGET: 'Click just the image you want to replace, then try again.',
@@ -373,33 +373,55 @@ export function mountPanel(root, {
     });
   }
 
-  /** Lets a card be dragged onto the canvas, carrying the image file itself. */
+  /** Lets a picture be dragged onto the canvas, as its <img> HTML (see getData). */
   function draggable(node, item) {
     if (!caps.drag) return;
+    let origin = null;
     const settle = () => {
       clearTimeout(dragTimer);
       dragging = false;
+      origin = null;
+      window.removeEventListener('pointerup', settle);
+      if (node.classList.contains('is-lifted') && live) live.textContent = '';
+      node.classList.remove('is-lifted');
+      root.classList.remove('is-dragging');
       if (renderQueued) render();
     };
-    node.addEventListener('pointerdown', () => {
+    // Workspace draws no copy of the picture under the pointer, so show here that the drag began
+    // (same 6px threshold as the SDK). The panel can't re-render mid-drag, so this is classes only.
+    node.addEventListener('pointermove', (e) => {
+      if (!origin || node.classList.contains('is-lifted')) return;
+      if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < 6) return;
+      node.classList.add('is-lifted');
+      root.classList.add('is-dragging');
+      if (live) live.textContent = 'Dragging. Release over the page to add the image.';
+    });
+    node.addEventListener('pointerdown', (e) => {
+      origin = { x: e.clientX, y: e.clientY };
       dragging = true;
       // A plain click ends here; a real drag hands the pointer to Workspace and ends in onResult.
-      window.addEventListener('pointerup', settle, { once: true });
+      window.addEventListener('pointerup', settle, { once: true }); // re-adding the same listener doesn't stack
       clearTimeout(dragTimer);
       dragTimer = setTimeout(settle, 125000); // Workspace gives up on a drag after two minutes
     });
     node.addEventListener('dragend', settle); // the browser's own drag (older hosts) ends here
+    node.addEventListener('pointercancel', settle); // touch scroll or the browser taking over the gesture
     actions.makeDraggable({
       element: node,
+      // The image is already in DA, so drag its <img> rather than the file. On the layout view
+      // Workspace drops a file only onto an existing image, while HTML can go anywhere; it also
+      // keeps the alt text and doesn't upload a second copy.
       getData: () => {
-        const blob = blobs.get(item.key ?? item.src);
+        if (item.src.startsWith('https://')) return { data: { 'text/html': imageHtml({ src: item.src, alt: item.alt ?? '' }) } };
+        const blob = blobs.get(item.key ?? item.src); // demo images have no public address: send the file
         if (!blob) throw new Error('not loaded');
         return { files: [new File([blob], item.name || 'image.jpg', { type: blob.type || 'image/jpeg' })] };
       },
       onResult: ({ ok, error }) => {
         settle();
         if (ok) flash('success', 'Image added to the page.');
-        else if (error !== 'cancelled') flash('error', error === 'invalid-drag-data' ? 'That image is still loading.' : `The image couldn't be dropped there (${error}).`);
+        else if (error === 'invalid-target') flash('error', 'Release over the page content to add the image.');
+        else if (error !== 'cancelled') flash('error', `The image couldn't be dropped there (${error}).`);
       },
     }).then((dispose) => disposers.push(dispose)).catch(() => {});
   }

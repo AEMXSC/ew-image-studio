@@ -136,6 +136,15 @@ body {
 .is-variant .is-thumb { aspect-ratio: auto; }
 .is-variant .is-thumb img { height: auto; }
 .is-variant.saved .is-thumb { cursor: grab; }
+
+/* Mid-drag: Workspace shows only a copy cursor, so the panel marks the picture and says what to do. */
+.is-lifted { opacity: 0.4; outline: 2px dashed var(--s2-blue-800, #4b75ff); outline-offset: -2px; }
+
+.is.is-dragging::after {
+  content: "Dragging. Release over the page to add the image." / ""; /* the live region already announces it */
+  position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 10; padding: 10px 12px; border-radius: 8px;
+  background: var(--s2-blue-900, #3b63fb); color: #fff; font-weight: 700; text-align: center; pointer-events: none;
+}
 .is-variant-body { display: flex; flex-direction: column; gap: 6px; }
 .is-saved { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--s2-green-1000, #03714a); margin: 0 !important; }
 .is-saved .is-icon { color: var(--s2-green-800, #07905b); }

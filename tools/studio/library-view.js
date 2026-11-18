@@ -19,7 +19,7 @@ function card(ctx, item) {
     slot: 'media', src: ctx.thumbUrl(item.src) || undefined, 'data-thumb': item.src, alt: '', className: 'is-card-media',
   });
   // The picture is the drag source; the menu stays clickable.
-  ctx.draggable(media, { key: item.src, src: item.src, name: item.name });
+  ctx.draggable(media, { key: item.src, src: item.src, name: item.name, alt: item.alt });
   const actions = [
     caps.insert && { id: 'insert', label: 'Insert at cursor', icon: 'imageadd' },
     caps.replace && { id: 'replace', label: 'Replace selected image', icon: 'replace' },
@@ -91,6 +91,6 @@ export function libraryView(ctx) {
         iconButton('folder', 'Studio images', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(STUDIO_FOLDER) }),
         pageFolder !== STUDIO_FOLDER && iconButton('folder', 'This page\'s folder', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(pageFolder) }))),
     library.items.length > 6 && search,
-    ctx.caps.drag && library.items.length > 0 && el('p', { className: 'is-fine' }, 'Drag a picture onto the page. Drop it on an image to replace that one.'),
+    ctx.caps.drag && library.items.length > 0 && el('p', { className: 'is-fine' }, 'Drag a picture onto the page to add it there.'),
     box);
 }

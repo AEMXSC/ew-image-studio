@@ -106,7 +106,7 @@ function variantCard(ctx, v, index) {
   const saved = v.status === 'saved';
   // Only the picture is draggable: the drag helper captures the pointer, which would swallow button clicks.
   const picture = el('span', { className: 'is-thumb' }, el('img', { src: ctx.thumbUrl(key), alt: v.alt || `Option ${index + 1}` }));
-  if (saved) ctx.draggable(picture, { key: v.src, src: v.src, name: v.name });
+  if (saved) ctx.draggable(picture, { key: v.src, src: v.src, name: v.name, alt: v.alt });
   return el('li', { className: `is-variant${saved ? ' saved' : ''}` },
     picture,
     saved
