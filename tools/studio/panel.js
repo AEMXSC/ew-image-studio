@@ -403,7 +403,7 @@ export function mountPanel(root, {
     });
   }
 
-  /** Lets a picture be dragged onto the canvas, as its <img> HTML (see getData). */
+  /** Lets a picture be dragged onto the canvas as an image file (see getData). */
   function draggable(node, item) {
     if (!caps.drag) return;
     let origin = null;
@@ -424,7 +424,7 @@ export function mountPanel(root, {
       if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < 6) return;
       node.classList.add('is-lifted');
       root.classList.add('is-dragging');
-      if (live) live.textContent = 'Dragging. Release over the page to add the image.';
+      if (live) live.textContent = 'Dragging. Drop it on an image to replace it, or between content to add it.';
     });
     node.addEventListener('pointerdown', (e) => {
       origin = { x: e.clientX, y: e.clientY };
@@ -441,16 +441,19 @@ export function mountPanel(root, {
       // The image is already in DA, so drag its <img> rather than the file. On the layout view
       // Workspace drops a file only onto an existing image, while HTML can go anywhere; it also
       // keeps the alt text and doesn't upload a second copy.
+      // A file, not HTML: Workspace replaces an image only when a file is dropped on it (HTML is
+      // inserted between content instead). The trade-off: Workspace uploads the file again and the
+      // drop carries no alt text; Insert and Replace selected keep the alt text.
       getData: () => {
-        if (item.src.startsWith('https://')) return { data: { 'text/html': imageHtml({ src: item.src, alt: item.alt ?? '' }) } };
-        const blob = blobs.get(item.key ?? item.src); // demo images have no public address: send the file
+        const blob = blobs.get(item.key ?? item.src); // getData can't fetch: the bytes must be loaded
         if (!blob) throw new Error('not loaded');
         return { files: [new File([blob], item.name || 'image.jpg', { type: blob.type || 'image/jpeg' })] };
       },
       onResult: ({ ok, error }) => {
         settle();
         if (ok) flash('success', 'Image added to the page.');
-        else if (error === 'invalid-target') flash('error', 'Release over the page content to add the image.');
+        else if (error === 'invalid-target') flash('error', 'Drop it on an image on the page to replace it, or use Insert.');
+        else if (error === 'invalid-drag-data') flash('warn', 'That image is still loading. Try again in a moment.');
         else if (error !== 'cancelled') flash('error', `The image couldn't be dropped there (${error}).`);
       },
     }).then((dispose) => disposers.push(dispose)).catch(() => {});

@@ -141,7 +141,7 @@ body {
 .is-lifted { opacity: 0.4; outline: 2px dashed var(--s2-blue-800, #4b75ff); outline-offset: -2px; }
 
 .is.is-dragging::after {
-  content: "Dragging. Release over the page to add the image." / ""; /* the live region already announces it */
+  content: "Drop it on an image to replace it." / ""; /* the live region already announces it */
   position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 10; padding: 10px 12px; border-radius: 8px;
   background: var(--s2-blue-900, #3b63fb); color: #fff; font-weight: 700; text-align: center; pointer-events: none;
 }

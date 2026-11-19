@@ -91,6 +91,6 @@ export function libraryView(ctx) {
         iconButton('folder', 'Studio images', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(STUDIO_FOLDER) }),
         pageFolder !== STUDIO_FOLDER && iconButton('folder', 'This page\'s folder', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(pageFolder) }))),
     library.items.length > 6 && search,
-    ctx.caps.drag && library.items.length > 0 && el('p', { className: 'is-fine' }, 'Drag a picture onto the page to add it there.'),
+    ctx.caps.drag && library.items.length > 0 && el('p', { className: 'is-fine' }, 'Drag a picture onto an image on the page to replace it.'),
     box);
 }

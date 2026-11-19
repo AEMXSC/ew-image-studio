@@ -132,7 +132,7 @@ export function placeActions(ctx, item) {
     caps.replace && iconButton('replace', 'Replace selected', {
       className: 'nx-action-btn nx-btn-sm', key: `replace-${item.src}`, title: 'Replace the image selected on the page', onClick: () => ctx.replaceSelected(item),
     }),
-    caps.drag && el('span', { className: 'is-fine' }, 'or drag the picture onto the page'));
+    caps.drag && el('span', { className: 'is-fine' }, 'or drag the picture onto an image on the page to replace it'));
 }
 
 export function createView(ctx) {
