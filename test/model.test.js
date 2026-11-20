@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildPrompt, cleanAlt, contentUrl, escapeHtml, fileName, filterLibrary, imageHtml, isPublicMedia,
-  libraryItems, normalizeFolder, pageFolder, pagePrompt, pickImageModel, readPage, sourceUrl, styleFromConfig,
+  blockAspect, buildPrompt, cleanAlt, contentUrl, escapeHtml, fileName, filterLibrary, imageHtml, isPublicMedia,
+  libraryItems, normalizeFolder, pageFolder, pagePrompt, pickImageModel, placePrompt, readPage, sourceUrl,
+  startPrompt, styleFromConfig,
   uniqueName,
 } from '../tools/studio/model.js';
 
@@ -124,4 +125,33 @@ test('default image model: Flash, stable, newest', () => {
   const ids = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3-pro-image', 'gemini-3.1-flash-image-preview', 'gemini-3.1-flash-lite-image', 'gemini-3.1-flash-image'];
   assert.equal(pickImageModel(ids.map((id) => ({ id }))), 'gemini-3.1-flash-image');
   assert.equal(pickImageModel([]), '');
+});
+
+test('block prompt: names the block and the page, uses its text; no text falls back to the page', () => {
+  const page = { title: 'Autumn house blend', text: 'Caramel notes.' };
+  const prompt = startPrompt(page, { name: 'cards', text: 'Hazelnut latte. Warm and nutty.' }, '4:3');
+  assert.match(prompt, /^A card image for the Cards block on a web page titled "Autumn house blend"\./);
+  assert.match(prompt, /The block says: Hazelnut latte\. Warm and nutty\.\n/);
+  assert.equal(startPrompt(page, { name: 'hero', text: '' }, '16:9'), pagePrompt(page, '16:9'));
+  assert.equal(startPrompt(page, null, '16:9'), pagePrompt(page, '16:9'));
+  assert.match(startPrompt({ title: '', text: '' }, { name: 'image-text', text: 'Hi' }), /for the Image text block\. The block/);
+});
+
+test('block shape: known blocks pick one, others keep the current shape', () => {
+  assert.equal(blockAspect('hero'), '16:9');
+  assert.equal(blockAspect('cards'), '4:3');
+  assert.equal(blockAspect('columns'), null);
+  assert.equal(blockAspect(undefined), null);
+});
+
+test('chat prompt: image, alt text or decorative, and where to put it', () => {
+  const src = 'https://content.da.live/aemxsc/frescopa26/media/studio/latte.jpg';
+  const inBlock = placePrompt({ src, alt: 'A latte on a café table' }, { name: 'cards', text: '' });
+  assert.match(inBlock, /^Add this image to the page in the Cards block where my cursor is\.\n/);
+  assert.ok(inBlock.includes(`Image: ${src}`));
+  assert.match(inBlock, /Alt text: A latte on a café table/);
+  assert.match(inBlock, /ask me before replacing it/);
+  const decorative = placePrompt({ src, alt: '' });
+  assert.match(decorative, /^Add this image to the page where my cursor is\./);
+  assert.match(decorative, /decorative: use empty alt text \(alt=""\)/);
 });

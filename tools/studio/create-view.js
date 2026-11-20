@@ -2,7 +2,9 @@
  * Create tab: generate from the page or edit an image, with optional
  * reference images, then accept the variants worth keeping.
  */
-import { ASPECTS, MAX_REFERENCES, VARIANTS } from './model.js';
+import {
+  ASPECTS, MAX_REFERENCES, VARIANTS, blockLabel,
+} from './model.js';
 import {
   el, icon, iconButton, picker, segmented, toggle,
 } from './ui.js';
@@ -85,7 +87,7 @@ function references(ctx) {
         'aria-expanded': String(Boolean(open)),
         onClick: () => ctx.set({ refsOpen: !open }),
       })),
-    !refs.length && !open && el('p', { className: 'is-fine' }, 'Add a product shot to keep the real product in the picture.'),
+    !refs.length && !open && el('p', { className: 'is-fine' }, 'Add a product shot to keep the real product in the picture, or drop image files on the panel.'),
     refs.length > 0 && el('ul', { className: 'is-strip' }, refs.map((r) => el('li', { className: 'is-ref' },
       thumb(ctx, r.key, r.name),
       el('button', {
@@ -156,6 +158,9 @@ export function placeActions(ctx, item) {
   const { caps } = ctx;
   return el('div', { className: 'is-row' },
     caps.insert && iconButton('imageadd', 'Insert', { className: 'nx-action-btn nx-btn-sm', key: `insert-${item.src}`, onClick: () => ctx.insert(item) }),
+    caps.chat && iconButton('magicwand', 'Ask chat to place it', {
+      className: 'nx-action-btn nx-btn-sm', key: `chat-${item.src}`, title: 'Ask the Workspace assistant to put this image on the page', onClick: () => ctx.askChat(item),
+    }),
     caps.replace && iconButton('replace', 'Replace selected', {
       className: 'nx-action-btn nx-btn-sm', key: `replace-${item.src}`, title: 'Replace the image selected on the page', onClick: () => ctx.replaceSelected(item),
     }),
@@ -186,9 +191,11 @@ export function createView(ctx) {
         !edit && state.promptTouched && el('button', {
           type: 'button',
           className: 'nx-action-btn-quiet nx-btn-sm',
-          onClick: () => { ctx.set({ promptTouched: false }); ctx.setAspect(state.aspect); },
-        }, 'Start again from the page')),
-      prompt),
+          onClick: ctx.resetPrompt,
+        }, state.block?.text ? `Start again from the ${blockLabel(state.block.name)} block` : 'Start again from the page')),
+      prompt,
+      !edit && !state.promptTouched && state.block?.text && el('p', { className: 'is-fine' },
+        `Written from the ${blockLabel(state.block.name)} block your cursor is in.`)),
     references(ctx),
     el('div', { className: 'is-field' },
       el('span', { className: 'is-label' }, 'Shape'),

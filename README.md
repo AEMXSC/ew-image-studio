@@ -24,12 +24,16 @@ choose which model to use.
 ## How an author uses it
 
 1. **Open a page and the panel.** The **Create** tab starts with a prompt
-   written from the page: its heading and opening copy. Edit it, or write your own.
+   written from the page: its heading and opening copy. With the cursor in a
+   block, the prompt is written from that block instead, and a hero or cards
+   block picks its usual shape. Edit it, or write your own.
 2. **Make a new image or edit one.** **New image** generates from the prompt.
    **Edit an image** changes an image from the page, the Library or your
    computer ("autumn café background, warmer light") and keeps everything else.
 3. **Keep the real product.** Add up to three **reference images**, such as a
    product shot, and the product appears as it really is, label included.
+   Image files dropped on the panel are added as references (or become the
+   image to edit, in **Edit an image** before one is picked).
 4. **Pick the shape:** Hero (16:9), Card (4:3), Square or Portrait. Each run
    makes three variants. **Edit this** refines one; **Discard** drops it.
 5. **Accept.** Only accepted images leave the browser: each is saved to the
@@ -48,6 +52,9 @@ choose which model to use.
    Or use **Insert** (at the cursor) or **Replace selected** (the image selected
    on the page), both with alt text. Workspace shows only a copy cursor while
    you drag, so the panel dims the source and shows a reminder until you drop.
+
+   Or **Ask chat to place it**: the Workspace assistant gets the image, its alt
+   text and the block your cursor is in, ready for you to check and send.
 7. **Library.** The **Library** tab shows the site's images a folder at a time,
    newest first. Any of them can be dragged onto the page, edited, or used as a
    reference.
@@ -93,6 +100,18 @@ columns, and a row with key `style`:
 
 The panel adds it to every prompt. Authors can switch it off per image.
 
+### Optional: a chat skill for Ask chat to place it
+
+[`skills/image-studio.md`](skills/image-studio.md) tells the Workspace
+assistant how to place an image the panel hands it: the given address and alt
+text, only that one image changed in the block, and a question before replacing
+anything. Without it the assistant still gets the prompt; the skill makes it
+more careful.
+
+Add it in the Workspace **Skills** editor (new skill, paste the file), or save
+the file as `/.da/skills/image-studio.md` in the site; the Skills editor adds
+the matching `skills` config row the next time it opens.
+
 ### Run your own copy
 
 The row above loads the code from this repository, so changes here reach your
@@ -111,6 +130,7 @@ fork, and use `https://main--{repo}--{owner}.aem.page/tools/studio/studio.html`
 | Drag the picture | – | Workspace uploads the image file next to the page | The dropped-on image replaced; **Add alt text** follows |
 | Drag **+ Add** | – | – | `<img>` with alt text, inserted where it's dropped |
 | Insert / Replace selected | The image, if it has no alt text yet | – | `<img>` with alt text |
+| Ask chat to place it | The image, if it has no alt text yet | – | Nothing until the author sends the chat prompt |
 
 ## What data goes where
 

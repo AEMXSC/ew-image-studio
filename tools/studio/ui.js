@@ -22,6 +22,33 @@ export function icon(name) {
 }
 
 /**
+ * Image files dragged from the computer onto the panel. Without this the browser opens a dropped
+ * file in place of the panel. While files are over it, `target` gets data-files set to `as()`.
+ */
+export function fileDrop(target, onFiles, as) {
+  let depth = 0; // dragenter/dragleave fire for every child crossed
+  const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
+  const clear = () => { depth = 0; delete target.dataset.files; };
+  document.addEventListener('dragenter', (e) => {
+    if (!hasFiles(e)) return;
+    depth += 1;
+    target.dataset.files = as();
+  });
+  document.addEventListener('dragleave', (e) => {
+    if (!hasFiles(e)) return;
+    depth -= 1;
+    if (depth <= 0) clear();
+  });
+  document.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+  document.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    clear();
+    onFiles(e.dataTransfer.files);
+  });
+}
+
+/**
  * Tiny hyperscript helper. `href` only accepts http(s) URLs; `key` marks a
  * focusable element so focus survives re-renders; `props` sets properties
  * (for the shared components' items/value/checked).
