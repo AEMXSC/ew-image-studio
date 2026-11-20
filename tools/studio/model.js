@@ -71,6 +71,12 @@ export function readPage(html = '', limit = 600) {
 // ---------- prompts ----------
 
 const NO_TEXT = 'No words, letters or logos in the image.';
+// Not "room for a headline": the model then paints a (garbled) headline into the picture.
+const PHOTO = 'Photographic, natural light, with calm empty space on one side; the page adds its own text.';
+/** The usual shape for blocks we know, by block name (the block's first class). */
+const BLOCK_ASPECTS = Object.freeze({
+  hero: '16:9', banner: '16:9', carousel: '16:9', cards: '4:3',
+});
 const NO_OTHER_TEXT = 'Keep the labels on the reference products exactly as they are; no other words, letters or logos anywhere.';
 
 /** Starting prompt for a new image, from the page. The author edits it before generating. */
@@ -78,8 +84,40 @@ export function pagePrompt({ title, text }, aspect = '16:9') {
   const use = ASPECTS.find((a) => a.id === aspect)?.label.toLowerCase() ?? 'hero';
   if (!title && !text) return `A ${use} image for this web page. Photographic, natural light.`;
   const about = [title && `"${title}"`, text && `The page says: ${text}`].filter(Boolean).join('. ');
-  // Not "room for a headline": the model then paints a (garbled) headline into the picture.
-  return `A ${use} image for a web page titled ${about}\nPhotographic, natural light, with calm empty space on one side; the page adds its own text.`;
+  return `A ${use} image for a web page titled ${about}\n${PHOTO}`;
+}
+
+/** "cards" → "Cards", "image-text" → "Image text": a block name as authors see it. */
+export function blockLabel(name = '') {
+  const words = name.replace(/-/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The shape that suits a block, or null when we don't know the block. */
+export function blockAspect(name = '') {
+  return BLOCK_ASPECTS[name] ?? null;
+}
+
+/**
+ * Starting prompt for a new image: from the block the cursor is in when it has text
+ * ({ name, text }), otherwise from the page. The author edits it before generating.
+ */
+export function startPrompt(page, block, aspect = '16:9') {
+  if (!block?.text) return pagePrompt(page, aspect);
+  const use = ASPECTS.find((a) => a.id === aspect)?.label.toLowerCase() ?? 'hero';
+  const on = page.title ? ` on a web page titled "${page.title}"` : '';
+  return `A ${use} image for the ${blockLabel(block.name)} block${on}. The block says: ${block.text}\n${PHOTO}`;
+}
+
+/** What the Workspace assistant is asked to do with a saved image ({ src, alt }; alt '' when decorative). */
+export function placePrompt({ src, alt }, block = null) {
+  const where = block ? `in the ${blockLabel(block.name)} block where my cursor is` : 'where my cursor is';
+  return [
+    `Add this image to the page ${where}.`,
+    `Image: ${src}`,
+    alt ? `Alt text: ${alt}` : 'It is decorative: use empty alt text (alt="").',
+    'If an image is already there, ask me before replacing it. Change nothing else on the page.',
+  ].join('\n');
 }
 
 /**

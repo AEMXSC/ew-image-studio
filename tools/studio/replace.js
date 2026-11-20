@@ -59,6 +59,20 @@ export function findImage(html, name) {
   };
 }
 
+/**
+ * The selected block's name (its first class, e.g. "cards") and text, images left out and cut at
+ * a word after `limit` characters. Null when the block isn't in the snapshot or has no name.
+ * Workspace leaves page and section metadata out of the block index, so they never show up here.
+ */
+export function readBlock(html, blockIndex, limit = 400) {
+  const block = findBlock(parse(html), blockIndex);
+  const name = block?.classList[0]?.toLowerCase();
+  if (!name) return null;
+  let text = block.textContent.replace(/\s+/g, ' ').trim();
+  if (text.length > limit) text = `${text.slice(0, limit).replace(/\s+\S*$/, '')}…`;
+  return { name, text };
+}
+
 /** The images in the selected block, as [{ label }], or null when the block isn't in the snapshot. */
 export function blockImages(html, blockIndex) {
   const block = findBlock(parse(html), blockIndex);

@@ -4,14 +4,16 @@
  * passed to them, nothing else.
  */
 import {
-  MAX_REFERENCES, STUDIO_FOLDER, VARIANTS, buildPrompt, fileName, imageHtml, normalizeFolder,
-  pagePrompt, pageFolder, pickImageModel, readPage, uniqueName,
+  MAX_REFERENCES, STUDIO_FOLDER, VARIANTS, blockAspect, buildPrompt, fileName, imageHtml, normalizeFolder,
+  pageFolder, pickImageModel, placePrompt, readPage, startPrompt, uniqueName,
 } from './model.js';
-import { blockImages, findImage, swapBlockImage } from './replace.js';
+import {
+  blockImages, findImage, readBlock, swapBlockImage,
+} from './replace.js';
 import { createGeminiAdapter } from './gemini.js';
 import { base64ToBlob, modelInput, toJpeg, urlPool } from './images.js';
 import {
-  el, external, icon, menu,
+  el, external, fileDrop, icon, menu,
 } from './ui.js';
 import { createView } from './create-view.js';
 import { libraryView } from './library-view.js';
@@ -49,10 +51,12 @@ export function mountPanel(root, {
     prompt: '',
     promptTouched: false,
     aspect: '16:9',
+    aspectTouched: false, // the author picked a shape: a block no longer picks it for them
     style: '',
     useStyle: true,
     variants: [], // [{ id, status, prompt, alt, src, error }]
     page: { title: '', text: '', images: [] },
+    block: null, // { name, text } of the block the cursor is in, from the live document
     library: { folder: storage.folder(page.org, page.site) ?? STUDIO_FOLDER, items: [], loaded: false, query: '', shown: PAGE_SIZE },
     busy: '',
     message: null, // { level, text }
@@ -81,6 +85,7 @@ export function mountPanel(root, {
     replace: capabilities.sendHTMLReplace === 1,
     insert: typeof actions.sendHTML === 'function',
     live: capabilities.liveDocument === 1 && typeof actions.subscribeLiveDocument === 'function',
+    chat: typeof actions.setPrompt === 'function',
   };
 
   const set = (patch) => { Object.assign(state, patch); render(); };
@@ -145,14 +150,20 @@ export function mountPanel(root, {
 
   // ---------- the page ----------
 
-  function usePage(html) {
+  /** Reads the page and the block the cursor is in; an untouched prompt (and shape) follows them. */
+  function usePage(html, blockIndex = null) {
     const summary = readPage(html);
-    const sig = JSON.stringify(summary);
+    const block = blockIndex === null ? null : readBlock(html, blockIndex);
+    const sig = JSON.stringify([summary, block]);
     if (sig === lastPage) return;
     lastPage = sig;
+    const follow = !state.promptTouched && state.mode !== 'edit';
+    const aspect = follow && !state.aspectTouched ? blockAspect(block?.name) ?? state.aspect : state.aspect;
     set({
       page: summary,
-      prompt: state.promptTouched || state.mode === 'edit' ? state.prompt : pagePrompt(summary, state.aspect),
+      block,
+      aspect,
+      prompt: follow ? startPrompt(summary, block, aspect) : state.prompt,
     });
     summary.images.forEach((i) => queueThumb(i.src));
   }
@@ -163,8 +174,10 @@ export function mountPanel(root, {
       unsubscribe = actions.subscribeLiveDocument(({ html, selection }) => {
         const blockIndex = Number.isInteger(selection?.blockIndex) ? selection.blockIndex : null;
         const changed = html !== liveDoc?.html;
+        const moved = blockIndex !== liveDoc?.blockIndex;
         liveDoc = { html, blockIndex };
-        if (changed) { usePage(html); checkDropped(); }
+        if (changed || moved) usePage(html, blockIndex);
+        if (changed) checkDropped();
       });
       return;
     }
@@ -213,13 +226,13 @@ export function mountPanel(root, {
 
   function setMode(mode) {
     const patch = { mode };
-    if (mode === 'generate' && !state.promptTouched) patch.prompt = pagePrompt(state.page, state.aspect);
+    if (mode === 'generate' && !state.promptTouched) patch.prompt = startPrompt(state.page, state.block, state.aspect);
     if (mode === 'edit' && !state.promptTouched) patch.prompt = '';
     set(patch);
   }
 
   function setAspect(aspect) {
-    set({ aspect, prompt: state.promptTouched || state.mode === 'edit' ? state.prompt : pagePrompt(state.page, aspect) });
+    set({ aspect, prompt: state.promptTouched || state.mode === 'edit' ? state.prompt : startPrompt(state.page, state.block, aspect) });
   }
 
   function editImage(item) {
@@ -241,7 +254,9 @@ export function mountPanel(root, {
 
   /** Images picked from the author's computer, as the image to edit or as references. */
   function addFiles(files, as) {
-    [...files].filter((f) => f.type.startsWith('image/')).forEach((f) => {
+    const images = [...files].filter((f) => f.type.startsWith('image/'));
+    if (!images.length) { flash('warn', 'Only image files can be used.'); return; }
+    images.forEach((f) => {
       const key = `f:${nextId}`;
       nextId += 1;
       blobs.set(key, f);
@@ -421,6 +436,15 @@ export function mountPanel(root, {
       const alt = await altFor(item);
       actions.sendHTML(imageHtml({ src: item.src, alt }));
       flash('success', 'Image inserted at the cursor.');
+    });
+  }
+
+  /** Hands the saved image to the Workspace assistant to place; the author reviews the prompt first. */
+  function askChat(item) {
+    guard('Opening chat', async () => {
+      const alt = await altFor(item); // '' when decorative
+      actions.setPrompt(placePrompt({ src: item.src, alt }, state.block), { autoSend: false });
+      flash('success', 'Added to the chat. Check the prompt, then send it.');
     });
   }
 
@@ -610,7 +634,8 @@ export function mountPanel(root, {
     // Library filtering redraws its cards without a full render: drop their old drag registrations.
     resetDrags: () => { disposers.forEach((d) => d()); disposers = []; },
     setMode,
-    setAspect,
+    setAspect: (aspect) => { state.aspectTouched = true; setAspect(aspect); },
+    resetPrompt: () => set({ promptTouched: false, prompt: startPrompt(state.page, state.block, state.aspect) }),
     editImage,
     addReference,
     removeReference,
@@ -620,6 +645,7 @@ export function mountPanel(root, {
     discard,
     refine,
     insert,
+    askChat,
     replaceSelected,
     openFolder,
     showMore,
@@ -802,6 +828,9 @@ export function mountPanel(root, {
   }
 
   render();
+  // Files dropped in Edit mode before an image is picked become the image to edit, otherwise references.
+  const dropAs = () => (state.mode === 'edit' && !state.source ? 'source' : 'ref');
+  fileDrop(root, (files) => { if (state.view === 'main') addFiles(dropAs() === 'source' ? [files[0]] : files, dropAs()); }, dropAs);
   if (!page.org || !page.site) {
     set({ view: 'error', error: 'Open a page in Experience Workspace to use Image Studio.' });
   } else {
