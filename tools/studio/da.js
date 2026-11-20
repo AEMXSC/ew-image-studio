@@ -5,7 +5,7 @@
  * images are only fetched through it when they are this org's DA files.
  */
 import {
-  contentUrl, isPublicMedia, libraryItems, normalizeFolder, sourceUrl, styleFromConfig,
+  contentUrl, isPublicMedia, libraryFolders, libraryItems, normalizeFolder, sourceUrl, styleFromConfig,
 } from './model.js';
 
 const ADMIN = 'https://admin.da.live';
@@ -31,11 +31,12 @@ export function createDa({ org, site, daFetch, fetch = (...a) => window.fetch(..
     org,
     site,
 
-    /** Images in a folder of the site, newest first. A missing folder is just empty. */
+    /** A folder of the site: its images, newest first, and its subfolders. A missing folder is just empty. */
     async list(folder) {
       const resp = await daFetch(`${ADMIN}/list/${org}/${site}${normalizeFolder(folder)}`);
-      if (resp.status === 404) return [];
-      return libraryItems(await check(resp, 'list images').json(), org, site);
+      if (resp.status === 404) return { items: [], folders: [] };
+      const list = await check(resp, 'list images').json();
+      return { items: libraryItems(list, org, site), folders: libraryFolders(list, org, site) };
     },
 
     /** Saves an image to the site; resolves with the address the page will use. */

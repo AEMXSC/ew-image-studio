@@ -251,6 +251,24 @@ export function libraryItems(list, org, site) {
     .sort((a, b) => b.modified - a.modified || a.name.localeCompare(b.name));
 }
 
+/** Subfolders in a DA list response (entries without `ext`), as [{ path, name }] by name; hidden ones left out. */
+export function libraryFolders(list, org, site) {
+  const prefix = `/${org}/${site}`;
+  return (Array.isArray(list) ? list : [])
+    .filter((e) => e?.path && !e.ext && !String(e.name ?? '').startsWith('.'))
+    .map((e) => {
+      const path = e.path.startsWith(`${prefix}/`) ? e.path.slice(prefix.length) : e.path;
+      return { path, name: path.split('/').pop() };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** The folders from the site root down to `folder`, for a breadcrumb: [{ path, name }], root first. */
+export function folderTrail(folder = '/') {
+  const parts = normalizeFolder(folder).split('/').filter(Boolean);
+  return [{ path: '/', name: 'Site' }, ...parts.map((name, i) => ({ path: `/${parts.slice(0, i + 1).join('/')}`, name }))];
+}
+
 export function filterLibrary(items, query = '') {
   const q = query.trim().toLowerCase();
   if (!q) return items;

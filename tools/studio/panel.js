@@ -57,7 +57,7 @@ export function mountPanel(root, {
     variants: [], // [{ id, status, prompt, alt, src, error }]
     page: { title: '', text: '', images: [] },
     block: null, // { name, text } of the block the cursor is in, from the live document
-    library: { folder: storage.folder(page.org, page.site) ?? STUDIO_FOLDER, items: [], loaded: false, query: '', shown: PAGE_SIZE },
+    library: { folder: storage.folder(page.org, page.site) ?? STUDIO_FOLDER, items: [], folders: [], loaded: false, query: '', shown: PAGE_SIZE },
     busy: '',
     message: null, // { level, text }
     error: '',
@@ -400,13 +400,13 @@ export function mountPanel(root, {
     storage.setFolder(page.org, page.site, clean);
     set({
       library: {
-        ...state.library, folder: clean, folderDraft: null, query: '', loaded: false, error: '', shown: PAGE_SIZE,
+        ...state.library, folder: clean, folders: [], query: '', loaded: false, error: '', shown: PAGE_SIZE,
       },
     });
     try {
-      const items = await da.list(clean);
+      const { items, folders } = await da.list(clean);
       if (state.library.folder !== clean) return; // another folder was opened meanwhile
-      set({ library: { ...state.library, items, loaded: true } });
+      set({ library: { ...state.library, items, folders, loaded: true } });
       items.slice(0, PAGE_SIZE).forEach((i) => queueThumb(i.src));
     } catch (e) {
       if (state.library.folder !== clean) return;

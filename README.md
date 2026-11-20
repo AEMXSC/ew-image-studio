@@ -165,7 +165,7 @@ fork, and use `https://main--{repo}--{owner}.aem.page/tools/studio/studio.html`
 - **Replace selected** needs the image selected on the page and a Workspace
   version that supports replacing; otherwise insert the new image and delete the old one.
 - Images on other hosts than DA or Edge Delivery can't be edited from the page.
-- The Library lists one folder at a time, without subfolders.
+- The Library lists one folder at a time; open subfolders from its **Subfolders** menu.
 
 ## Other image models
 

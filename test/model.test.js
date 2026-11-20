@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  blockAspect, buildPrompt, cleanAlt, contentUrl, escapeHtml, fileName, filterLibrary, imageHtml, isPublicMedia,
+  blockAspect, buildPrompt, cleanAlt, contentUrl, escapeHtml, fileName, filterLibrary, folderTrail, imageHtml,
+  isPublicMedia, libraryFolders,
   libraryItems, normalizeFolder, pageFolder, pagePrompt, pickImageModel, placePrompt, readPage, sourceUrl,
   startPrompt, styleFromConfig,
   uniqueName,
@@ -154,4 +155,22 @@ test('chat prompt: image, alt text or decorative, and where to put it', () => {
   const decorative = placePrompt({ src, alt: '' });
   assert.match(decorative, /^Add this image to the page where my cursor is\./);
   assert.match(decorative, /decorative: use empty alt text \(alt=""\)/);
+});
+
+test('library folders: entries without ext, site-relative, by name, hidden ones left out', () => {
+  const folders = libraryFolders([
+    { path: '/o/s/media/studio', name: 'studio' },
+    { path: '/o/s/media/brand', name: 'brand' },
+    { path: '/o/s/media/.trash', name: '.trash' },
+    { path: '/o/s/media/hero.jpg', name: 'hero', ext: 'jpg' },
+  ], 'o', 's');
+  assert.deepEqual(folders, [{ path: '/media/brand', name: 'brand' }, { path: '/media/studio', name: 'studio' }]);
+  assert.deepEqual(libraryFolders(null, 'o', 's'), []);
+});
+
+test('folder trail: site root first, then each folder down to the current one', () => {
+  assert.deepEqual(folderTrail('/media/studio/'), [
+    { path: '/', name: 'Site' }, { path: '/media', name: 'media' }, { path: '/media/studio', name: 'studio' },
+  ]);
+  assert.deepEqual(folderTrail('/'), [{ path: '/', name: 'Site' }]);
 });
