@@ -56,6 +56,10 @@ test('file names are readable, unique and typed', () => {
   const now = new Date(2026, 10, 18, 9, 5, 7);
   assert.equal(fileName('A hero image for the Café Autumn blend!', 'image/jpeg', now), 'hero-cafe-autumn-blend-20261118-090507.jpg');
   assert.equal(fileName('???', 'image/png', now), 'studio-20261118-090507.png');
+  assert.equal(fileName(pagePrompt({ title: 'Learn to pull the perfect shot', text: 'Two-hour classes.' }), 'image/jpeg', now),
+    'hero-learn-to-pull-perfect-shot-20261118-090507.jpg', 'the panel\'s own opening words are skipped');
+  assert.equal(fileName(startPrompt({ title: 'Autumn house blend' }, { name: 'cards', text: 'Hazelnut latte' }, '4:3'), 'image/jpeg', now),
+    'card-autumn-house-blend-hazelnut-latte-20261118-090507.jpg');
 });
 
 test('review fixes: unique names per variant, encoded addresses, safe entities, <p> only', () => {

@@ -68,7 +68,10 @@ export function readBlock(html, blockIndex, limit = 400) {
   const block = findBlock(parse(html), blockIndex);
   const name = block?.classList[0]?.toLowerCase();
   if (!name) return null;
-  let text = block.textContent.replace(/\s+/g, ' ').trim();
+  // A space after each block-level element, so a card's heading and copy don't run together.
+  const copy = block.cloneNode(true);
+  copy.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div').forEach((n) => n.append(' '));
+  let text = copy.textContent.replace(/\s+/g, ' ').trim();
   if (text.length > limit) text = `${text.slice(0, limit).replace(/\s+\S*$/, '')}…`;
   return { name, text };
 }

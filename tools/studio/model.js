@@ -158,12 +158,15 @@ export function cleanAlt(text = '') {
 
 /** Readable, unique file name: the prompt's first words plus a timestamp. */
 export function fileName(prompt, mime = 'image/jpeg', now = new Date(), suffix = '') {
-  const words = prompt.toLowerCase()
+  // Skip the opening the panel writes ("A hero image for [the Cards block on] a web page titled"),
+  // so the name says what the image is about: hero-learn-to-pull-perfect-shot-….
+  const words = prompt.replace(/^A (\w+) image for (?:the [\w ]+? block on )?a web page titled /i, '$1 ')
+    .toLowerCase()
     .normalize('NFKD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .split(' ')
-    .filter((w) => w && !['a', 'an', 'the', 'for', 'of', 'and', 'with', 'image', 'web', 'page'].includes(w))
+    .filter((w) => w && !['a', 'an', 'the', 'for', 'of', 'and', 'with', 'image', 'web', 'page', 'block', 'says'].includes(w))
     .slice(0, 6);
   const pad = (n) => String(n).padStart(2, '0');
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
