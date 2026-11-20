@@ -132,6 +132,21 @@ export function fileName(prompt, mime = 'image/jpeg', now = new Date(), suffix =
   return `${words.join('-') || 'studio'}-${stamp}${suffix === '' ? '' : `-${suffix}`}.${extFor(mime)}`;
 }
 
+/**
+ * "Café Hero.JPG" → "cafe-hero-m3k9x2a1.jpg": a name no other drop has used, so the dropped copy
+ * can be found on the page. Lowercase letters, digits and dashes only, so storage can't rename it.
+ */
+export function uniqueName(name, now = Date.now()) {
+  const m = /^(.*?)(\.[a-z0-9]+)?$/i.exec(name);
+  const base = m[1].toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 200);
+  return `${base || 'image'}-${now.toString(36)}${(m[2] ?? '.jpg').toLowerCase()}`;
+}
+
 export function extFor(mime = '') {
   return { 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }[mime] ?? 'jpg';
 }

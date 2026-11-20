@@ -11,11 +11,14 @@
 const INSTRUMENTATION = ['data-block-index', 'data-prose-index', 'data-image-index', 'data-image-version',
   'data-cursor-remote', 'data-cursor-remote-color'];
 
+function sortedBlocks(doc) {
+  return [...doc.querySelectorAll('[data-block-index]')]
+    .sort((a, b) => Number(a.dataset.blockIndex) - Number(b.dataset.blockIndex));
+}
+
 /** The selected block in a live-document snapshot: `blockIndex` is its 0-based order among blocks. */
 function findBlock(doc, blockIndex) {
-  const blocks = [...doc.querySelectorAll('[data-block-index]')]
-    .sort((a, b) => Number(a.dataset.blockIndex) - Number(b.dataset.blockIndex));
-  return blocks[blockIndex] ?? null;
+  return sortedBlocks(doc)[blockIndex] ?? null;
 }
 
 function parse(html) {
@@ -30,6 +33,30 @@ function label(img, index) {
   } catch {
     return `Image ${index + 1}`;
   }
+}
+
+/**
+ * Finds the image whose file is `name` (as Workspace stored a dropped file) in a live-document
+ * snapshot: { src, alt, blockIndex, which }, with blockIndex null outside a block. Null if absent.
+ */
+export function findImage(html, name) {
+  const doc = parse(html);
+  const img = [...doc.querySelectorAll('img')].find((i) => {
+    try {
+      return decodeURIComponent(new URL(i.getAttribute('src') ?? '', 'https://x.invalid').pathname.split('/').pop()) === name;
+    } catch {
+      return false;
+    }
+  });
+  if (!img) return null;
+  const block = img.closest('[data-block-index]');
+  const blockIndex = block ? sortedBlocks(doc).indexOf(block) : null;
+  return {
+    src: img.getAttribute('src'),
+    alt: (img.getAttribute('alt') ?? '').trim(),
+    blockIndex,
+    which: block ? [...block.querySelectorAll('img')].indexOf(img) : 0,
+  };
 }
 
 /** The images in the selected block, as [{ label }], or null when the block isn't in the snapshot. */

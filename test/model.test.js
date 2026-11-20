@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildPrompt, cleanAlt, contentUrl, escapeHtml, fileName, filterLibrary, imageHtml, isPublicMedia,
   libraryItems, normalizeFolder, pageFolder, pagePrompt, pickImageModel, readPage, sourceUrl, styleFromConfig,
+  uniqueName,
 } from '../tools/studio/model.js';
 
 const PAGE = `<main><div>
@@ -62,6 +63,15 @@ test('review fixes: unique names per variant, encoded addresses, safe entities, 
   assert.equal(readPage('<h1>Caf&#x00e9; &#99999999;</h1>').title, 'Café', 'hex decoded, out-of-range dropped, no throw');
   const page = readPage('<picture><source srcset="x"></picture><pre>code block that is long enough</pre><p>A real paragraph that is long enough.</p>');
   assert.equal(page.text, 'A real paragraph that is long enough.');
+});
+
+test('dropped files get a name no other drop has used', () => {
+  assert.equal(uniqueName('cafe.jpg', 36 ** 3), 'cafe-1000.jpg');
+  assert.equal(uniqueName('a/b.PNG', 35), 'a-b-z.png', 'no path separators: Workspace refuses them');
+  assert.equal(uniqueName('Café Hero!.JPG', 1), 'cafe-hero-1.jpg', 'storage-safe: lowercase ASCII and dashes');
+  assert.equal(uniqueName('???.jpg', 1), 'image-1.jpg');
+  assert.equal(uniqueName('noext', 1), 'noext-1.jpg');
+  assert.notEqual(uniqueName('x.jpg', 1), uniqueName('x.jpg', 2));
 });
 
 test('folders and DA addresses', () => {

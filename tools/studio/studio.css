@@ -140,11 +140,22 @@ body {
 /* Mid-drag: Workspace shows only a copy cursor, so the panel marks the picture and says what to do. */
 .is-lifted { opacity: 0.4; outline: 2px dashed var(--s2-blue-800, #4b75ff); outline-offset: -2px; }
 
-.is.is-dragging::after {
+.is[data-drag]::after {
   content: "Drop it on an image to replace it." / ""; /* the live region already announces it */
   position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 10; padding: 10px 12px; border-radius: 8px;
   background: var(--s2-blue-900, #3b63fb); color: #fff; font-weight: 700; text-align: center; pointer-events: none;
 }
+.is[data-drag="html"]::after { content: "Drop it between content to add it." / ""; }
+
+/* "Add" drag handle: drags the image's HTML, which Workspace inserts between content. */
+.is-grip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border-radius: 8px; cursor: grab;
+  border: 1px dashed var(--s2-gray-500, #8f8f8f); font-size: 12px; font-weight: 700; user-select: none;
+}
+.is-grip .is-icon { width: 14px; height: 14px; }
+.is-grip:hover { border-color: var(--s2-blue-800, #4b75ff); color: var(--s2-blue-900, #3b63fb); }
+.is-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.is-alt-copy { user-select: all; font-style: italic; }
 .is-variant-body { display: flex; flex-direction: column; gap: 6px; }
 .is-saved { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--s2-green-1000, #03714a); margin: 0 !important; }
 .is-saved .is-icon { color: var(--s2-green-800, #07905b); }

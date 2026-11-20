@@ -39,7 +39,9 @@ function card(ctx, item) {
       menu({
         label: `Actions for ${item.name}`, items: actions, onSelect: (id) => run[id](), key: `menu-${item.src}`, slot: 'actions',
       }),
-      item.modified && el('span', { slot: 'metadata' }, shortDate(item.modified))));
+      el('span', { slot: 'metadata', className: 'is-meta' },
+        item.modified ? shortDate(item.modified) : '',
+        ctx.addHandle({ key: item.src, src: item.src, name: item.name, alt: item.alt }))));
 }
 
 function results(ctx) {
@@ -91,6 +93,6 @@ export function libraryView(ctx) {
         iconButton('folder', 'Studio images', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(STUDIO_FOLDER) }),
         pageFolder !== STUDIO_FOLDER && iconButton('folder', 'This page\'s folder', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(pageFolder) }))),
     library.items.length > 6 && search,
-    ctx.caps.drag && library.items.length > 0 && el('p', { className: 'is-fine' }, 'Drag a picture onto an image on the page to replace it.'),
+    ctx.caps.drag && library.items.length > 0 && el('p', { className: 'is-fine', 'aria-hidden': 'true' }, 'Drag a picture onto an image on the page to replace it, or drag Add between content to add it.'),
     box);
 }

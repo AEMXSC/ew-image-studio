@@ -5,18 +5,21 @@
  */
 import {
   MAX_REFERENCES, STUDIO_FOLDER, VARIANTS, buildPrompt, fileName, imageHtml, normalizeFolder,
-  pagePrompt, pageFolder, pickImageModel, readPage,
+  pagePrompt, pageFolder, pickImageModel, readPage, uniqueName,
 } from './model.js';
-import { blockImages, swapBlockImage } from './replace.js';
+import { blockImages, findImage, swapBlockImage } from './replace.js';
 import { createGeminiAdapter } from './gemini.js';
 import { base64ToBlob, modelInput, toJpeg, urlPool } from './images.js';
-import { el, external, menu } from './ui.js';
+import {
+  el, external, icon, menu,
+} from './ui.js';
 import { createView } from './create-view.js';
 import { libraryView } from './library-view.js';
 
 const KEY_HELP = 'https://aistudio.google.com/app/apikey';
 const THUMB_CONCURRENCY = 6;
 const PAGE_SIZE = 24;
+const DROP_WATCH_MS = 20000; // how long to look for a dropped file on the page
 const REPLACE_ERRORS = {
   unsupported: 'This version of Workspace can\'t replace images from a panel. Insert the new image, then delete the old one.',
   READ_ONLY: 'You can\'t edit this page.',
@@ -40,6 +43,7 @@ export function mountPanel(root, {
     mode: 'generate', // generate | edit
     source: null, // { key, name } of the image being edited
     choose: null, // { item, images } while asking which image in a block to replace
+    altFix: null, // { name, item, blockIndex } after a file drop left an image without alt text
     refs: [], // [{ key, name }]
     refsOpen: false,
     prompt: '',
@@ -58,6 +62,7 @@ export function mountPanel(root, {
   let nextId = 1;
   let unsubscribe = null;
   let liveDoc = null; // latest live-document snapshot: { html, blockIndex }
+  let dropWatches = []; // [{ name, item, until }]: dropped files we're waiting to see on the page
   let lastPage = '';
   let dragging = false;
   let renderQueued = false;
@@ -159,7 +164,7 @@ export function mountPanel(root, {
         const blockIndex = Number.isInteger(selection?.blockIndex) ? selection.blockIndex : null;
         const changed = html !== liveDoc?.html;
         liveDoc = { html, blockIndex };
-        if (changed) usePage(html);
+        if (changed) { usePage(html); checkDropped(); }
       });
       return;
     }
@@ -403,10 +408,81 @@ export function mountPanel(root, {
     });
   }
 
-  /** Lets a picture be dragged onto the canvas as an image file (see getData). */
-  function draggable(node, item) {
+  // ---------- alt text for dropped files ----------
+  // A dropped file reaches the page without alt text (Workspace uploads only the bytes). We gave
+  // it a unique name, so once it shows up in the live document we offer to add the alt text.
+
+  function trackDrop(name, item) {
+    if (!caps.live || !caps.replace) { flash('success', 'Image added. Add its alt text in the editor.'); return; }
+    dropWatches.push({ name, item, until: Date.now() + DROP_WATCH_MS });
+    setTimeout(checkDropped, DROP_WATCH_MS + 100); // reports a drop that never showed up
+    flash('success', 'Image added to the page.');
+    checkDropped();
+  }
+
+  /** Runs on every changed snapshot: matches pending drops and keeps the alt-text note current. */
+  function checkDropped() {
+    if (!liveDoc) return;
+    const { html } = liveDoc;
+    dropWatches = dropWatches.filter(({ name, item, until }) => {
+      const found = findImage(html, name);
+      if (found) {
+        if (!found.alt) set({ altFix: { name, item, blockIndex: found.blockIndex } });
+        return false;
+      }
+      if (Date.now() > until) {
+        flash('warn', 'The image was added, but the panel can\'t find it on the page. Add its alt text in the editor.');
+        return false;
+      }
+      return true;
+    });
+    const fix = state.altFix;
+    if (!fix) return;
+    const found = findImage(html, fix.name);
+    if (!found || found.alt) set({ altFix: null }); // removed, or alt text added in the editor
+    else if (found.blockIndex !== fix.blockIndex) set({ altFix: { ...fix, blockIndex: found.blockIndex } });
+  }
+
+  /** Writes alt text onto the dropped image: only when the cursor is in its block, never blind. */
+  function addDroppedAlt() {
+    const fix = state.altFix;
+    // Alt text can take seconds; a newer drop may have replaced this note meanwhile.
+    const setIfCurrent = (patch) => { if (state.altFix?.name === fix.name) set(patch); };
+    guard('Adding alt text', async () => {
+      // eslint-disable-next-line no-param-reassign -- kept for a retry
+      if (!fix.item.alt) fix.item.alt = await altFor(fix.item);
+      if (!fix.item.alt) throw new Error('No alt text could be written for this image. Add it in the editor.');
+      const snap = liveDoc; // after the await: the freshest snapshot
+      const now = snap && findImage(snap.html, fix.name);
+      if (!now || now.alt) { setIfCurrent({ altFix: null }); return; } // gone, or alt added by hand
+      // Outside a block there's no safe target: show the text for copying instead.
+      if (now.blockIndex === null) { setIfCurrent({ altFix: { ...fix, blockIndex: null } }); return; }
+      if (snap.blockIndex !== now.blockIndex) {
+        flash('info', 'Click the image you dropped on the page, then press Add alt text again.');
+        return;
+      }
+      const html = swapBlockImage(snap.html, now.blockIndex, now.which, { src: now.src, alt: fix.item.alt });
+      if (!html) throw new Error('The dropped image is no longer in its block.');
+      const expected = { html: snap.html, blockIndex: now.blockIndex };
+      const result = await actions.sendHTML(html, { replace: true, expected });
+      if (!result?.ok) throw new Error(REPLACE_ERRORS[result?.error] ?? result?.message ?? 'The alt text was not added.');
+      setIfCurrent({ altFix: null });
+      flash('success', 'Alt text added.');
+    });
+  }
+
+  /**
+   * Lets `node` be dragged onto the canvas. Workspace decides what a drop does from the payload,
+   * so there are two kinds of drag source:
+   * - 'file' (the picture): an image file, which replaces the image it's dropped on. Workspace
+   *   uploads it again and it carries no alt text, so we follow up with trackDrop.
+   * - 'html' (the "Add" handle): the saved image's <img>, inserted between content with its alt
+   *   text and no second upload.
+   */
+  function draggable(node, item, kind = 'file') {
     if (!caps.drag) return;
     let origin = null;
+    let dropName = '';
     const settle = () => {
       clearTimeout(dragTimer);
       dragging = false;
@@ -414,7 +490,7 @@ export function mountPanel(root, {
       window.removeEventListener('pointerup', settle);
       if (node.classList.contains('is-lifted') && live) live.textContent = '';
       node.classList.remove('is-lifted');
-      root.classList.remove('is-dragging');
+      delete root.dataset.drag;
       if (renderQueued) render();
     };
     // Workspace draws no copy of the picture under the pointer, so show here that the drag began
@@ -423,8 +499,8 @@ export function mountPanel(root, {
       if (!origin || node.classList.contains('is-lifted')) return;
       if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < 6) return;
       node.classList.add('is-lifted');
-      root.classList.add('is-dragging');
-      if (live) live.textContent = 'Dragging. Drop it on an image to replace it, or between content to add it.';
+      root.dataset.drag = kind; // shows the matching reminder (studio.css)
+      if (live) live.textContent = kind === 'html' ? 'Dragging. Drop it between content to add it.' : 'Dragging. Drop it on an image to replace it.';
     });
     node.addEventListener('pointerdown', (e) => {
       origin = { x: e.clientX, y: e.clientY };
@@ -438,21 +514,19 @@ export function mountPanel(root, {
     node.addEventListener('pointercancel', settle); // touch scroll or the browser taking over the gesture
     actions.makeDraggable({
       element: node,
-      // The image is already in DA, so drag its <img> rather than the file. On the layout view
-      // Workspace drops a file only onto an existing image, while HTML can go anywhere; it also
-      // keeps the alt text and doesn't upload a second copy.
-      // A file, not HTML: Workspace replaces an image only when a file is dropped on it (HTML is
-      // inserted between content instead). The trade-off: Workspace uploads the file again and the
-      // drop carries no alt text; Insert and Replace selected keep the alt text.
       getData: () => {
+        if (kind === 'html') return { data: { 'text/html': imageHtml({ src: item.src, alt: item.alt ?? '' }) } };
         const blob = blobs.get(item.key ?? item.src); // getData can't fetch: the bytes must be loaded
         if (!blob) throw new Error('not loaded');
-        return { files: [new File([blob], item.name || 'image.jpg', { type: blob.type || 'image/jpeg' })] };
+        dropName = uniqueName(item.name || 'image.jpg'); // so the dropped copy can be found on the page
+        return { files: [new File([blob], dropName, { type: blob.type || 'image/jpeg' })] };
       },
       onResult: ({ ok, error }) => {
         settle();
-        if (ok) flash('success', 'Image added to the page.');
-        else if (error === 'invalid-target') flash('error', 'Drop it on an image on the page to replace it, or use Insert.');
+        if (ok && kind === 'file') { trackDrop(dropName, item); return; }
+        if (ok) { flash('success', 'Image added to the page.'); return; }
+        const where = kind === 'html' ? 'between content on the page' : 'on an image on the page to replace it';
+        if (error === 'invalid-target') flash('error', `Drop it ${where}, or use Insert.`);
         else if (error === 'invalid-drag-data') flash('warn', 'That image is still loading. Try again in a moment.');
         else if (error !== 'cancelled') flash('error', `The image couldn't be dropped there (${error}).`);
       },
@@ -467,6 +541,15 @@ export function mountPanel(root, {
     set,
     thumbUrl,
     draggable,
+    /** The "Add" handle: drags the saved image's HTML, which Workspace inserts between content. */
+    addHandle: (item) => {
+      if (!caps.drag) return null;
+      // Pointer-only (aria-hidden): Insert is the keyboard route to the same result.
+      const handle = el('span', { className: 'is-grip', title: 'Drag between content on the page to add this image', 'aria-hidden': 'true' },
+        icon('add'), 'Add');
+      draggable(handle, item, 'html');
+      return handle;
+    },
     wantThumb: queueThumb,
     thumbFailed: (key) => failedThumbs.has(key),
     // Library filtering redraws its cards without a full render: drop their old drag registrations.
@@ -620,6 +703,25 @@ export function mountPanel(root, {
             type: 'button', className: 'nx-action-btn nx-action-btn-quiet nx-btn-sm', key: 'choose-cancel', onClick: () => set({ choose: null }),
           }, 'Cancel')));
     };
+    // After a file drop: the image has no alt text. Inside a block we can add it (the cursor must
+    // be in that block); outside one, Workspace gives no safe target, so we show it for copying.
+    const altFixView = () => {
+      const { item, blockIndex } = state.altFix;
+      const known = item.alt && blockIndex === null;
+      return el('div', { className: 'is-note warn is-choose', role: 'status' }, // announced: it appears after a drop
+        el('p', {}, known
+          ? 'The image you dropped has no alt text. Add this in the editor:'
+          : 'The image you dropped has no alt text.'),
+        known && el('p', { className: 'is-alt-copy' }, item.alt),
+        el('div', { className: 'is-row' },
+          !known && el('button', {
+            type: 'button', className: 'nx-btn-accent nx-btn-sm', key: 'altfix-add', disabled: !!state.busy, onClick: addDroppedAlt,
+          }, blockIndex === null ? 'Write alt text' : 'Add alt text'),
+          blockIndex !== null && el('span', { className: 'is-fine' }, 'Click the image on the page first.'),
+          el('button', {
+            type: 'button', className: 'nx-action-btn nx-action-btn-quiet nx-btn-sm', key: 'altfix-dismiss', onClick: () => set({ altFix: null }),
+          }, 'Dismiss')));
+    };
     const body = {
       loading: () => el('p', { className: 'is-fine is-center' }, 'Loading…'),
       connect: connectView,
@@ -631,6 +733,7 @@ export function mountPanel(root, {
       !embedded && !demo && el('p', { className: 'is-note info' }, `Standalone mode: ${page.org}/${page.site}${page.path}. Putting images on the page needs Experience Workspace.`),
       state.message && el('p', { className: `is-note ${state.message.level}` }, state.message.text),
       state.choose && chooseView(),
+      state.altFix && altFixView(),
       // Generating shows its spinner in the button; other waits get the S2 progress bar.
       state.busy && state.busy !== 'Generating' && state.view === 'main' && el('div', { className: 'is-progress', role: 'progressbar', 'aria-label': state.busy }),
       body,

@@ -34,11 +34,17 @@ choose which model to use.
    makes three variants. **Edit this** refines one; **Discard** drops it.
 5. **Accept.** Only accepted images leave the browser: each is saved to the
    site's `/media/studio/` folder in DA with alt text written for it.
-6. **Put it on the page.** Drag the picture onto an image on the page to
-   replace it, or use **Insert** (at the cursor, with alt text) or **Replace
-   selected** (swaps the image selected on the page, with alt text). Workspace
-   shows only a copy cursor while you drag, so the panel dims the picture and
-   shows a reminder until you drop it.
+6. **Put it on the page.** Two drag handles, because Workspace decides what a
+   drop does from what is dragged:
+   - **The picture** (an image file): drop it on an image to replace it. The
+     file carries no alt text, so the panel then offers **Add alt text** (click
+     the image first; outside a block it shows the text to paste).
+   - **+ Add** (the image's HTML): drop it between content to add it, with alt
+     text and no second upload.
+
+   Or use **Insert** (at the cursor) or **Replace selected** (the image selected
+   on the page), both with alt text. Workspace shows only a copy cursor while
+   you drag, so the panel dims the source and shows a reminder until you drop.
 7. **Library.** The **Library** tab shows the site's images a folder at a time,
    newest first. Any of them can be dragged onto the page, edited, or used as a
    reference.
@@ -99,7 +105,8 @@ fork, and use `https://main--{repo}--{owner}.aem.page/tools/studio/studio.html`
 |---|---|---|---|
 | Generate / Make edits | The prompt, plus the edited image and references | – | – |
 | Accept | The image, to write alt text | Saved to `/media/studio/{prompt-words}-{time}.jpg` | – |
-| Drag onto the page | – | Workspace uploads the image file next to the page | The dropped-on image replaced (no alt text) |
+| Drag the picture | – | Workspace uploads the image file next to the page | The dropped-on image replaced; **Add alt text** follows |
+| Drag **+ Add** | – | – | `<img>` with alt text, inserted where it's dropped |
 | Insert / Replace selected | The image, if it has no alt text yet | – | `<img>` with alt text |
 
 ## What data goes where
@@ -122,11 +129,12 @@ fork, and use `https://main--{repo}--{owner}.aem.page/tools/studio/studio.html`
 
 - Gemini may decline prompts or images under Google's policies; the panel says
   so. Generated images can still get details wrong; check before you publish.
-- Dragging sends the image file, because Workspace replaces an image only when
-  a file is dropped on it. Workspace uploads that file again next to the page,
-  and a dropped file carries no alt text. **Insert** and **Replace selected**
-  reuse the saved image and write its alt text. Dragging needs a mouse or touch;
-  **Insert** is the keyboard route.
+- Dragging the picture sends the image file, because Workspace replaces an
+  image only when a file is dropped on it. Workspace uploads that file again
+  next to the page, and the drop carries no alt text: **Add alt text** writes it
+  afterwards, but only once the cursor is in that block (a panel can only edit
+  the block the cursor is in). **+ Add** and **Insert** reuse the saved image.
+  Dragging needs a mouse or touch; **Insert** is the keyboard route.
 - **Replace selected** inside a block (hero, cards…) sends the block back with
   only that image changed, so its text, links and other images stay; Workspace
   replaces whole blocks, so a lone image would wipe them. If the block has
