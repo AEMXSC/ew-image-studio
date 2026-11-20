@@ -3,8 +3,10 @@
  * Every image can be dragged onto the page, or inserted, replaced, edited
  * or used as a reference from its menu.
  */
-import { STUDIO_FOLDER, filterLibrary } from './model.js';
-import { el, iconButton, menu } from './ui.js';
+import { STUDIO_FOLDER, filterLibrary, folderTrail } from './model.js';
+import {
+  el, iconButton, menu, picker,
+} from './ui.js';
 
 function shortDate(ms) {
   if (!ms) return '';
@@ -61,16 +63,31 @@ function results(ctx) {
   ].filter(Boolean);
 }
 
+/** Where you are (each folder up to the site root is a link) and a menu of the subfolders. */
+function folderNav(ctx) {
+  const { library } = ctx.state;
+  const trail = folderTrail(library.folder);
+  const folders = library.folders ?? [];
+  return el('div', { className: 'is-field' },
+    el('span', { className: 'is-label', id: 'is-folder-label' }, 'Folder in this site'),
+    el('nav', { className: 'is-trail', 'aria-labelledby': 'is-folder-label' },
+      el('ol', {}, trail.map((f, i) => el('li', {},
+        i === trail.length - 1
+          ? el('span', { 'aria-current': 'location' }, f.name)
+          : el('button', {
+            type: 'button', className: 'nx-action-btn-quiet nx-btn-sm', key: `trail-${f.path}`, onClick: () => ctx.openFolder(f.path),
+          }, f.name))))),
+    folders.length > 0 && picker({
+      label: 'Open a subfolder',
+      key: 'subfolder',
+      value: '',
+      items: [{ value: '', label: `Subfolders (${folders.length})` }, ...folders.map((f) => ({ value: f.path, label: f.name }))],
+      onChange: (path) => { if (path) ctx.openFolder(path); },
+    }));
+}
+
 export function libraryView(ctx) {
   const { library } = ctx.state;
-  const folderInput = el('input', {
-    id: 'is-folder',
-    key: 'folder',
-    className: 'nx-input',
-    value: library.folderDraft ?? library.folder,
-    spellcheck: 'false',
-    onInput: (e) => { library.folderDraft = e.target.value; }, // survives re-renders until opened
-  });
   const box = el('div', { className: 'is-stack' }, results(ctx));
   // Filtering redraws only the results, so the search field keeps focus.
   const search = el('nx-search', {
@@ -88,12 +105,10 @@ export function libraryView(ctx) {
   const pageFolder = ctx.pageFolder();
 
   return el('div', { className: 'is-stack' },
-    el('form', { className: 'is-field', onSubmit: (e) => { e.preventDefault(); ctx.openFolder(folderInput.value); } },
-      el('label', { for: 'is-folder' }, 'Folder in this site'),
-      el('div', { className: 'is-row is-nowrap' }, folderInput, el('button', { type: 'submit', className: 'nx-action-btn', key: 'open-folder' }, 'Open')),
-      el('div', { className: 'is-row' },
-        iconButton('folder', 'Studio images', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(STUDIO_FOLDER) }),
-        pageFolder !== STUDIO_FOLDER && iconButton('folder', 'This page\'s folder', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(pageFolder) }))),
+    folderNav(ctx),
+    el('div', { className: 'is-row' },
+      iconButton('folder', 'Studio images', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(STUDIO_FOLDER) }),
+      pageFolder !== STUDIO_FOLDER && iconButton('folder', 'This page\'s folder', { className: 'nx-action-btn-quiet nx-btn-sm', onClick: () => ctx.openFolder(pageFolder) })),
     library.items.length > 6 && search,
     ctx.caps.drag && library.items.length > 0 && el('p', { className: 'is-fine', 'aria-hidden': 'true' }, 'Drag a picture onto an image on the page to replace it, or drag Add between content to add it.'),
     box);

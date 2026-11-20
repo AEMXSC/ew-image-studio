@@ -58,7 +58,9 @@ export function createDemoDa() {
   return {
     org: 'demo',
     site: 'frescopa',
-    async list() { return items; },
+    async list(folder) {
+      return folder === '/media/studio' ? { items, folders: [] } : { items: [], folders: [{ path: '/media/studio', name: 'studio' }] };
+    },
     async save(path) { await wait(500); return `demo://saved${path}`; }, // kept in this tab only
     async image(src) { return (await fetch(src)).blob(); },
     async pageHtml() { return DEMO_PAGE; },
