@@ -15,8 +15,16 @@ All four images were made with this panel's code and Nano Banana 2.
 
 ## What it does
 
-- **Images from the page itself.** The prompt is written from the page, or from the block the
-  cursor is in, so a hero gets a hero image and a card gets a card image.
+- **Knows the block you're in.** The prompt is written from the hero or card the cursor is
+  in, and the shape is picked for that block. **Replace selected** swaps only that one image
+  and keeps the block's text, links and other images.
+- **Drag and drop, both ways.** Drag a generated image onto an image on the page to replace
+  it, or drag **+ Add** between content to add it, with its alt text. Drop product shots from
+  your desktop onto the panel to use them as references.
+- **Works with Workspace chat.** **Ask chat to place it** hands the image, its alt text and the
+  current block to the Workspace assistant, ready to check and send. An optional
+  [chat skill](#optional-a-chat-skill-for-ask-chat-to-place-it) teaches the assistant to change
+  only that image.
 - **Edit what the site already has.** "Same shot, but autumn": change a photo from the page,
   the Library or your computer, and keep the rest of it.
 - **Keep the real product.** Add product shots as references, and the product appears as it
@@ -24,8 +32,6 @@ All four images were made with this panel's code and Nano Banana 2.
 - **On brand.** A style set once in the site config goes into every prompt.
 - **Accessible by default.** Every saved image gets alt text written for it, which the author
   can edit, or mark decorative.
-- **Straight onto the page.** Insert, replace the selected image, drag and drop, or ask the
-  Workspace assistant to place it.
 - **Choose the model.** Nano Banana or Nano Banana Pro, with the author's own Gemini key. Other
   models plug in through [one adapter](#other-image-models).
 
