@@ -150,7 +150,7 @@ body {
 .is[data-drag="html"]::after { content: "Drop it between content to add it." / ""; }
 
 /* Image files from the computer over the panel. */
-.is[data-files] { outline: 2px dashed var(--s2-blue-800, #4b75ff); outline-offset: -4px; }
+.is[data-files] { min-height: 100vh; outline: 2px dashed var(--s2-blue-800, #4b75ff); outline-offset: -4px; }
 .is[data-files="ref"]::after { content: "Drop to use as reference images." / ""; }
 .is[data-files="source"]::after { content: "Drop to edit this image." / ""; }
 

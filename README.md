@@ -13,6 +13,47 @@ with alt text, and lets the author drag them onto the page.
 
 All four images were made with this panel's code and Nano Banana 2.
 
+## For reviewers: try it in three minutes
+
+1. **No setup:** [open the demo](https://main--ew-image-studio--aemxsc.aem.page/tools/studio/studio.html?demo=1).
+   It uses sample images: nothing is sent to Google or saved.
+2. **In Workspace:** add the library row in [Add it to a site](#add-it-to-a-site), open a page,
+   choose **Panels › Image Studio** and paste a [Gemini API key](https://aistudio.google.com/app/apikey).
+   Then try each of these:
+   - Click into a hero or cards block. The prompt is rewritten from that block.
+   - Press **Generate 3 images**, **Accept** one, then **Insert** it, drag it onto an image, or press
+     **Ask chat to place it**.
+   - Switch to **Edit an image**, pick a photo from the page and say what to change.
+   - Drop a product shot from your desktop onto the panel to use it as a reference.
+   - Open **Library** and move between folders from the path or the **Subfolders** menu.
+
+## Feature tour
+
+| | |
+|---|---|
+| <img src="docs/screenshots/01-create-from-block.png" width="300" alt="Create tab: the prompt written from the Cards block the cursor is in, the Card shape picked, and the site's brand style switched on"> | **The prompt writes itself.** It starts from the page's heading and opening copy, or from the block the cursor is in. A hero or cards block also picks its shape. The site's brand style is added to every prompt, and authors can switch it off. |
+| <img src="docs/screenshots/02-three-variants.png" width="300" alt="Three generated variants of the product on a café table, each with Accept, Edit this and Discard"> | **Three options per run.** **Accept** the ones to keep, **Edit this** to refine one, or discard it. Nothing leaves the browser until it's accepted. |
+| <img src="docs/screenshots/03-saved-alt-text-and-place.png" width="300" alt="A saved image with alt text written by Gemini, a Decorative image switch, and Insert, Ask chat to place it, Replace selected and Add"> | **Saved with alt text.** An accepted image is saved to `/media/studio/` in DA. Gemini writes its alt text, which the author can edit, or the author can mark the image decorative. Then: **Insert** at the cursor, **Replace selected** (only that image in the block changes), drag the picture onto an image, drag **+ Add** between content, or **Ask chat to place it**. |
+| <img src="docs/screenshots/04-edit-with-reference.png" width="300" alt="Edit an image: a café photo from the page being edited, with a coffee bag as a reference image"> | **Edit what the site already has.** Pick a photo from the page, the Library or your computer and say what should change. Add up to three **reference images**, such as a product shot, so the real product appears with its label intact. |
+| <img src="docs/screenshots/08-workspace-edit.png" width="300" alt="In Experience Workspace: Edit an image, with a barista photo from the page to pick, From your computer and From the Library"> | **In Workspace.** The same step on a live page, the Fréscopa Barista Academy page. The page's own images are offered to edit, next to **From your computer** and **From the Library**. |
+| <img src="docs/screenshots/05-drop-files.png" width="300" alt="The panel outlined while image files are dragged over it, with the banner: Drop to use as reference images"> | **Drop files on the panel.** Drag image files from the desktop onto the panel to use them as references, or as the image to edit. |
+| <img src="docs/screenshots/06-library.png" width="300" alt="Library tab: folder path Site, media, studio, a Subfolders menu, and the site's images as cards"> | **Library.** The site's images, a folder at a time and newest first. Move between folders from the path or the **Subfolders** menu. Any image can be dragged onto the page, inserted, edited or used as a reference. |
+| <img src="docs/screenshots/07-connect.png" width="300" alt="Connect Google Gemini: a field for the API key"> | **The author's own key.** Each author pastes a Gemini key once. It stays in their browser and is sent only to Google. |
+
+The *In Workspace* screenshot is from Experience Workspace. The others show the panel's real code
+with the demo images, in a page that stands in for Workspace so that every button appears.
+
+**Ask chat to place it** fills the Workspace assistant's prompt; the author checks it and sends it:
+
+```text
+Add this image to the page in the Cards block where my cursor is.
+Image: https://content.da.live/aemxsc/frescopa26/media/studio/card-autumn-house-blend-hazelnut-latte-20261120-025659-1.jpg
+Alt text: A bag of Fréscopa Autumn House Blend beside a mug of coffee, hazelnuts and sliced apple on a wooden café table
+If an image is already there, ask me before replacing it. Change nothing else on the page.
+```
+
+The optional [chat skill](#optional-a-chat-skill-for-ask-chat-to-place-it) tells the assistant how to handle it.
+
 ## The problem
 
 Authors get stuck on images. Stock photos look generic, and a small change to
