@@ -12,14 +12,16 @@ function shortDate(ms) {
 }
 
 function card(ctx, item) {
-  const ref = { key: item.src, name: item.name, alt: item.alt };
+  const ref = {
+    key: item.src, src: item.src, name: item.name, alt: item.alt, decorative: item.decorative,
+  };
   const { caps } = ctx;
   if (!ctx.thumbUrl(item.src)) ctx.wantThumb(item.src);
   const media = el('img', {
     slot: 'media', src: ctx.thumbUrl(item.src) || undefined, 'data-thumb': item.src, alt: '', className: 'is-card-media',
   });
   // The picture is the drag source; the menu stays clickable.
-  ctx.draggable(media, { key: item.src, src: item.src, name: item.name, alt: item.alt });
+  ctx.draggable(media, ref);
   const actions = [
     caps.insert && { id: 'insert', label: 'Insert at cursor', icon: 'imageadd' },
     caps.replace && { id: 'replace', label: 'Replace selected image', icon: 'replace' },
@@ -41,7 +43,7 @@ function card(ctx, item) {
       }),
       el('span', { slot: 'metadata', className: 'is-meta' },
         item.modified ? shortDate(item.modified) : '',
-        ctx.addHandle({ key: item.src, src: item.src, name: item.name, alt: item.alt }))));
+        ctx.addHandle(ref))));
 }
 
 function results(ctx) {

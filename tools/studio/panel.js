@@ -286,6 +286,55 @@ export function mountPanel(root, {
     set({ variants: state.variants.map((v) => (v.id === id ? { ...v, ...patch } : v)) });
   }
 
+  /**
+   * The author's alt text for a saved image. Stored without a re-render: redrawing on every
+   * keystroke would swallow the click on Insert that often follows. The Library copy follows along.
+   */
+  function editAlt(id, alt) {
+    const v = state.variants.find((x) => x.id === id);
+    if (!v) return;
+    state.variants = state.variants.map((x) => (x.id === id ? { ...x, alt } : x));
+    patchLibraryItem(v.src, { alt });
+  }
+
+  /** Keeps the Library tab's copy of a saved image in step (it is drawn from its own list). */
+  function patchLibraryItem(src, patch) {
+    const items = state.library.items.map((i) => (i.src === src ? { ...i, ...patch } : i));
+    state.library = { ...state.library, items };
+  }
+
+  function setDecorative(id, decorative) {
+    const v = state.variants.find((x) => x.id === id);
+    if (v) patchLibraryItem(v.src, { decorative });
+    updateVariant(id, { decorative });
+  }
+
+  /**
+   * What Insert, Replace, the drag handles and the post-drop alt step get for a saved variant.
+   * It reads the variant when used, so edits made since the last render count.
+   */
+  function savedItem(id) {
+    let last = state.variants.find((x) => x.id === id) ?? {};
+    const current = () => {
+      last = state.variants.find((x) => x.id === id) ?? last; // still usable after Generate drops it
+      return last;
+    };
+    return {
+      key: last.src,
+      src: last.src,
+      name: last.name,
+      get alt() { return current().decorative ? '' : (current().alt ?? ''); },
+      // Alt text written later (Insert, Replace) is kept, also once a new Generate has dropped the
+      // variant. Never while decorative, and never blank: that would wipe the author's text.
+      set alt(text) {
+        if (!text || current().decorative) return;
+        last = { ...last, alt: text };
+        editAlt(id, text);
+      },
+      get decorative() { return !!current().decorative; },
+    };
+  }
+
   function dropVariants(test) {
     state.variants.filter(test).forEach((v) => { pool.drop(`v:${v.id}`); blobs.delete(`v:${v.id}`); });
     state.variants = state.variants.filter((v) => !test(v));
@@ -313,7 +362,7 @@ export function mountPanel(root, {
         const item = { path: `${STUDIO_FOLDER}/${src.split('/').pop()}`, name: src.split('/').pop(), modified: Date.now(), src, alt };
         state.library = { ...state.library, items: [item, ...state.library.items] };
       }
-      if (!alt) flash('warn', 'Saved, but without alt text: Google didn\'t write it. Add alt text on the page.');
+      if (!alt) flash('warn', 'Saved, but without alt text: Google didn\'t write it. Describe the image below, or mark it decorative.');
       else flash('success', caps.drag ? 'Saved to the site. Drag it onto the page.' : 'Saved to the site.');
     } catch (e) {
       updateVariant(id, { status: 'ready' });
@@ -361,6 +410,7 @@ export function mountPanel(root, {
 
   /** Alt text for an image going into the page: known, or written now. */
   async function altFor(item) {
+    if (item.decorative) return ''; // alt="" on purpose: screen readers skip it
     if (item.alt) return item.alt;
     const blob = blobs.get(item.key ?? item.src);
     return blob ? model.describe(await modelInput(blob)) : '';
@@ -391,8 +441,8 @@ export function mountPanel(root, {
       if (images.length > 1) { set({ choose: { item, images, snap } }); return; } // ask before writing alt text
     }
     guard('Replacing', async () => {
-      if (!item.alt) item.alt = await altFor(item); // eslint-disable-line no-param-reassign -- kept for a retry
-      const { alt } = item;
+      const alt = await altFor(item); // '' when decorative
+      if (alt && !item.alt) item.alt = alt; // eslint-disable-line no-param-reassign -- kept for a retry
       let html = imageHtml({ src: item.src, alt }).replace(/^<p>|<\/p>$/g, '');
       const options = { replace: true };
       if (inBlock) {
@@ -427,7 +477,7 @@ export function mountPanel(root, {
     dropWatches = dropWatches.filter(({ name, item, until }) => {
       const found = findImage(html, name);
       if (found) {
-        if (!found.alt) set({ altFix: { name, item, blockIndex: found.blockIndex } });
+        if (!found.alt && !item.decorative) set({ altFix: { name, item, blockIndex: found.blockIndex } });
         return false;
       }
       if (Date.now() > until) {
@@ -449,9 +499,10 @@ export function mountPanel(root, {
     // Alt text can take seconds; a newer drop may have replaced this note meanwhile.
     const setIfCurrent = (patch) => { if (state.altFix?.name === fix.name) set(patch); };
     guard('Adding alt text', async () => {
-      // eslint-disable-next-line no-param-reassign -- kept for a retry
-      if (!fix.item.alt) fix.item.alt = await altFor(fix.item);
-      if (!fix.item.alt) throw new Error('No alt text could be written for this image. Add it in the editor.');
+      const alt = await altFor(fix.item);
+      if (!alt) throw new Error('No alt text could be written for this image. Add it in the editor.');
+      // eslint-disable-next-line no-param-reassign -- kept for a retry, and shown for copying
+      if (!fix.item.alt) fix.item.alt = alt;
       const snap = liveDoc; // after the await: the freshest snapshot
       const now = snap && findImage(snap.html, fix.name);
       if (!now || now.alt) { setIfCurrent({ altFix: null }); return; } // gone, or alt added by hand
@@ -461,7 +512,7 @@ export function mountPanel(root, {
         flash('info', 'Click the image you dropped on the page, then press Add alt text again.');
         return;
       }
-      const html = swapBlockImage(snap.html, now.blockIndex, now.which, { src: now.src, alt: fix.item.alt });
+      const html = swapBlockImage(snap.html, now.blockIndex, now.which, { src: now.src, alt });
       if (!html) throw new Error('The dropped image is no longer in its block.');
       const expected = { html: snap.html, blockIndex: now.blockIndex };
       const result = await actions.sendHTML(html, { replace: true, expected });
@@ -515,7 +566,8 @@ export function mountPanel(root, {
     actions.makeDraggable({
       element: node,
       getData: () => {
-        if (kind === 'html') return { data: { 'text/html': imageHtml({ src: item.src, alt: item.alt ?? '' }) } };
+        const alt = item.decorative ? '' : (item.alt ?? '');
+        if (kind === 'html') return { data: { 'text/html': imageHtml({ src: item.src, alt }) } };
         const blob = blobs.get(item.key ?? item.src); // getData can't fetch: the bytes must be loaded
         if (!blob) throw new Error('not loaded');
         dropName = uniqueName(item.name || 'image.jpg'); // so the dropped copy can be found on the page
@@ -541,6 +593,9 @@ export function mountPanel(root, {
     set,
     thumbUrl,
     draggable,
+    savedItem,
+    editAlt,
+    setDecorative,
     /** The "Add" handle: drags the saved image's HTML, which Workspace inserts between content. */
     addHandle: (item) => {
       if (!caps.drag) return null;

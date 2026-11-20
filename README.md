@@ -33,7 +33,10 @@ choose which model to use.
 4. **Pick the shape:** Hero (16:9), Card (4:3), Square or Portrait. Each run
    makes three variants. **Edit this** refines one; **Discard** drops it.
 5. **Accept.** Only accepted images leave the browser: each is saved to the
-   site's `/media/studio/` folder in DA with alt text written for it.
+   site's `/media/studio/` folder in DA with alt text written for it. The alt
+   text is editable on the saved image, or switch on **Decorative image** to
+   insert it with empty alt text (`alt=""`) so screen readers skip it. Insert,
+   Replace selected and **+ Add** all use what you see there.
 6. **Put it on the page.** Two drag handles, because Workspace decides what a
    drop does from what is dragged:
    - **The picture** (an image file): drop it on an image to replace it. The

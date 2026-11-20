@@ -96,6 +96,32 @@ function references(ctx) {
     }));
 }
 
+/** Alt text for a saved image: written by Gemini, editable, or marked decorative (alt=""). */
+function altField(ctx, v) {
+  const id = `is-alt-${v.id}`;
+  let hint = 'Google didn\'t write alt text. Describe the image, or mark it decorative.';
+  if (v.decorative) hint = 'Inserted with empty alt text, so screen readers skip it. Use this only for images that add no information.';
+  else if (v.alt) hint = 'Written by Gemini. Check it, and edit it if it isn\'t right.';
+  return el('div', { className: 'is-field' },
+    el('label', { className: 'is-label', for: id }, 'Alt text'),
+    el('textarea', {
+      id,
+      rows: 2,
+      maxlength: 250,
+      className: 'nx-input is-alt-input',
+      key: `alt-${v.id}`,
+      value: v.decorative ? '' : (v.alt ?? ''),
+      placeholder: v.decorative ? 'Decorative image' : 'Describe the image',
+      disabled: !!v.decorative,
+      'aria-describedby': `${id}-hint`,
+      onInput: (e) => ctx.editAlt(v.id, e.target.value),
+    }),
+    el('p', { className: 'is-fine', id: `${id}-hint` }, hint),
+    toggle({
+      label: 'Decorative image (no alt text)', checked: !!v.decorative, key: `deco-${v.id}`, onChange: (on) => ctx.setDecorative(v.id, on),
+    }));
+}
+
 function variantCard(ctx, v, index) {
   const key = `v:${v.id}`;
   if (v.status === 'pending') {
@@ -106,14 +132,15 @@ function variantCard(ctx, v, index) {
   const saved = v.status === 'saved';
   // Only the picture is draggable: the drag helper captures the pointer, which would swallow button clicks.
   const picture = el('span', { className: 'is-thumb' }, el('img', { src: ctx.thumbUrl(key), alt: v.alt || `Option ${index + 1}` }));
-  if (saved) ctx.draggable(picture, { key: v.src, src: v.src, name: v.name, alt: v.alt });
+  const item = saved ? ctx.savedItem(v.id) : null; // reads the alt text as it is when used
+  if (saved) ctx.draggable(picture, item);
   return el('li', { className: `is-variant${saved ? ' saved' : ''}` },
     picture,
     saved
       ? el('div', { className: 'is-variant-body' },
         el('p', { className: 'is-saved' }, icon('checkmarkcircle'), 'Saved to the site'),
-        v.alt && el('p', { className: 'is-fine' }, `Alt text: ${v.alt}`),
-        placeActions(ctx, { key: v.src, src: v.src, name: v.name, alt: v.alt }))
+        altField(ctx, v),
+        placeActions(ctx, item))
       : el('div', { className: 'is-row' },
         el('button', {
           type: 'button', className: 'nx-btn-accent nx-btn-sm', key: `accept-${v.id}`, disabled: v.status === 'saving', onClick: () => ctx.accept(v.id),
